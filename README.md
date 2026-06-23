@@ -14,6 +14,7 @@ This repo now provides two sharable seams:
 - isolated request-building, HTTP execution, and response-parsing classes under `src/`
 - selected-version package acquisition into local staged artifacts under `.testbed/.artifacts/`
 - ZIP archive inspection plus normalized source-material manifest emission for downstream conversion lanes
+- hidden `.testbed/scenes/beatsaver_browser_testbed.tscn` proving surface with searchable/filterable result cards, right-side detail panel, and local-only staging CTA
 - truthful lightweight BeatSaver JSON fixtures under `assets/fixtures/beatsaver_api/`
 - synthetic metadata-only ZIP fixture under `.testbed/fixtures/packages/` for deterministic validation
 - planning + Beads homes inside the owning repo
@@ -23,7 +24,7 @@ Still intentionally **out of scope for this slice**:
 - Boxing/Flow conversion
 - final authored AeroBeat content generation
 - `plugin.cfg`
-- the full browse/detail/download UI workbench scene
+- any product-facing polished AeroBeat browser/install UX beyond the hidden proving scene
 
 ## Ownership boundary
 
@@ -88,6 +89,8 @@ Open the hidden workbench:
 godot --editor --path .testbed
 ```
 
+The default testbed scene is `res://scenes/beatsaver_browser_testbed.tscn`.
+
 ## Local validation
 
 Headless validation for the current slices:
@@ -96,7 +99,7 @@ Headless validation for the current slices:
 godot --headless --path .testbed -s res://scripts/validate_beatsaver_client_slice.gd
 ```
 
-This script exercises request building, fixture-driven parsing, the facade through an injected fake transport, and the acquisition/inspection/manifest seam through a synthetic metadata-only ZIP fixture.
+This script exercises request building, fixture-driven parsing, the facade through an injected fake transport, the hidden testbed state/UI flow (search, local filters, detail selection, version picking), and the acquisition/inspection/manifest seam through a synthetic metadata-only ZIP fixture.
 
 ## Content / legal note
 

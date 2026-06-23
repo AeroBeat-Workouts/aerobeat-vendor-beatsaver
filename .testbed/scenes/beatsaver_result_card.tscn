@@ -1,0 +1,51 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/beatsaver_result_card.gd" id="1_card"]
+[ext_resource type="Script" path="res://scripts/beatsaver_remote_image.gd" id="2_remote"]
+
+[node name="BeatSaverResultCard" type="Button"]
+custom_minimum_size = Vector2(0, 248)
+clip_contents = true
+focus_mode = 2
+toggle_mode = true
+flat = true
+script = ExtResource("1_card")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CoverImage" type="TextureRect" parent="Margin/VBox"]
+custom_minimum_size = Vector2(0, 136)
+layout_mode = 2
+expand_mode = 1
+script = ExtResource("2_remote")
+
+[node name="TitleLabel" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+text = "Title"
+autowrap_mode = 3
+
+[node name="SubtitleLabel" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+modulate = Color(0.78, 0.82, 0.9, 1)
+text = "Subtitle"
+autowrap_mode = 3
+
+[node name="TaglineLabel" type="Label" parent="Margin/VBox"]
+layout_mode = 2
+modulate = Color(0.65, 0.7, 0.8, 1)
+text = "Tagline"
+autowrap_mode = 3

@@ -11,5 +11,6 @@ config_version=5
 [application]
 
 config/name="AeroBeat Vendor BeatSaver Testbed"
+run/main_scene="res://scenes/beatsaver_browser_testbed.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 

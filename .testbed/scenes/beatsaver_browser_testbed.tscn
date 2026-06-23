@@ -1,0 +1,187 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/beatsaver_browser_testbed.gd" id="1_browser"]
+[ext_resource type="Script" path="res://scripts/beatsaver_remote_image.gd" id="2_remote"]
+
+[node name="BeatSaverBrowserTestbed" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_browser")
+
+[node name="RootMargin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/margin_left = 16
+theme_override_constants/margin_top = 16
+theme_override_constants/margin_right = 16
+theme_override_constants/margin_bottom = 16
+
+[node name="RootLayout" type="VBoxContainer" parent="RootMargin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HeaderPanel" type="PanelContainer" parent="RootMargin/RootLayout"]
+layout_mode = 2
+
+[node name="HeaderMargin" type="MarginContainer" parent="RootMargin/RootLayout/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="HeaderVBox" type="VBoxContainer" parent="RootMargin/RootLayout/HeaderPanel/HeaderMargin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ControlsRow" type="HBoxContainer" parent="RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="ModeOptionButton" type="OptionButton" parent="RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow"]
+custom_minimum_size = Vector2(110, 0)
+layout_mode = 2
+
+[node name="QueryLineEdit" type="LineEdit" parent="RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow"]
+custom_minimum_size = Vector2(220, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "BeatSaver remote search text"
+
+[node name="FilterLineEdit" type="LineEdit" parent="RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow"]
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Local text filter"
+
+[node name="TagFilterLineEdit" type="LineEdit" parent="RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Tag filter"
+
+[node name="RefreshButton" type="Button" parent="RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "Refresh"
+
+[node name="StatusRow" type="HBoxContainer" parent="RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="ResultsSummaryLabel" type="Label" parent="RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/StatusRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "0 visible results"
+
+[node name="StatusLabel" type="Label" parent="RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/StatusRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Ready."
+autowrap_mode = 3
+
+[node name="BodyLayout" type="HSplitContainer" parent="RootMargin/RootLayout"]
+layout_mode = 2
+size_flags_vertical = 3
+split_offset = 760
+
+[node name="ResultsPanel" type="PanelContainer" parent="RootMargin/RootLayout/BodyLayout"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="ResultsMargin" type="MarginContainer" parent="RootMargin/RootLayout/BodyLayout/ResultsPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
+
+[node name="ResultsVBox" type="VBoxContainer" parent="RootMargin/RootLayout/BodyLayout/ResultsPanel/ResultsMargin"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ResultsHeadingLabel" type="Label" parent="RootMargin/RootLayout/BodyLayout/ResultsPanel/ResultsMargin/ResultsVBox"]
+layout_mode = 2
+text = "BeatSaver Catalog Results"
+
+[node name="ResultsScroll" type="ScrollContainer" parent="RootMargin/RootLayout/BodyLayout/ResultsPanel/ResultsMargin/ResultsVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="ResultsGrid" type="GridContainer" parent="RootMargin/RootLayout/BodyLayout/ResultsPanel/ResultsMargin/ResultsVBox/ResultsScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12
+columns = 2
+
+[node name="DetailPanel" type="PanelContainer" parent="RootMargin/RootLayout/BodyLayout"]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="DetailMargin" type="MarginContainer" parent="RootMargin/RootLayout/BodyLayout/DetailPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="DetailVBox" type="VBoxContainer" parent="RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="DetailCoverImage" type="TextureRect" parent="RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox"]
+custom_minimum_size = Vector2(0, 220)
+layout_mode = 2
+expand_mode = 1
+script = ExtResource("2_remote")
+
+[node name="DetailTitleLabel" type="Label" parent="RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox"]
+layout_mode = 2
+text = "Select a BeatSaver result"
+autowrap_mode = 3
+
+[node name="DetailSubtitleLabel" type="Label" parent="RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox"]
+layout_mode = 2
+modulate = Color(0.8, 0.84, 0.92, 1)
+text = "Search or browse latest maps to inspect provider metadata."
+autowrap_mode = 3
+
+[node name="DetailMetadataLabel" type="RichTextLabel" parent="RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox"]
+custom_minimum_size = Vector2(0, 240)
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+fit_content = false
+scroll_following = false
+
+[node name="VersionRow" type="HBoxContainer" parent="RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="VersionLabel" type="Label" parent="RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/VersionRow"]
+layout_mode = 2
+text = "Version"
+
+[node name="VersionOptionButton" type="OptionButton" parent="RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/VersionRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="DownloadButton" type="Button" parent="RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox"]
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+text = "Stage Selected ZIP to .testbed/.artifacts"

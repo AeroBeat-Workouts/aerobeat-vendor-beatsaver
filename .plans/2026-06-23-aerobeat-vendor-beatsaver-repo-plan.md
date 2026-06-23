@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-23  
 **Status:** In Progress  
-**Last Updated:** 2026-06-23 07:14 EDT  
+**Last Updated:** 2026-06-23 08:28 EDT  
 **Blocked Reason:** None  
 **Agent:** `pico`
 
@@ -18,7 +18,7 @@ Design and then implement a new `aerobeat-vendor-beatsaver` repo that matches th
 
 This lane should be treated as a **read-only vendor acquisition package**, not as an AeroBeat gameplay/content package and not as the final public product API. BeatSaver already exposes the key provider surface we need: direct map lookup by id/hash, bulk id/hash lookup, uploader listings, latest/deleted feeds, full-text search, user lookup, playlist discovery, per-version download URLs, preview/cover URLs, uploader metadata, and an optional websocket mirror/update feed (`wss://ws.beatsaver.com/maps`) (`REF-01`). That makes `aerobeat-vendor-beatsaver` a strong fit for provider-specific transport, DTO normalization, and selected map-package acquisition.
 
-The clean AeroBeat polyrepo boundary is: **this repo owns BeatSaver transport + provider DTOs + normalized source-material staging; downstream repos own AeroBeat semantics**. Concretely, this repo should own request building, HTTP execution, response/error normalization, provider-side paging/cursor handling, version/package selection, and lightweight archive inspection/manifesting. It should not own Boxing/Flow authored chart conversion, canonical `workout.yaml` generation, durable AeroBeat content schema truth, or gameplay/runtime interpretation (`REF-02`, `REF-03`, `REF-06`). A repo-local hidden testbed UI **does** belong here, but only as a proving surface for this vendor package rather than as product-facing AeroBeat UX. Those product-facing authoring/import/runtime responsibilities still fit better in later importer/converter/runtime/tool repos.
+The clean AeroBeat polyrepo boundary is: **this repo owns BeatSaver transport + provider DTOs + normalized source-material staging; downstream repos own AeroBeat semantics**. Concretely, this repo should own request building, HTTP execution, response/error normalization, provider-side paging/cursor handling, version/package selection, and lightweight archive inspection/manifesting. It should not own Boxing/Flow authored chart conversion, canonical `workout.yaml` generation, durable AeroBeat content schema truth, or gameplay/runtime interpretation (`REF-02`, `REF-03`, `REF-06`). Derrick has now explicitly confirmed that Boxing/Flow conversion will happen in a **future separate repo**, so this repo should stay strictly provider-facing and stop at staged source-material manifests plus proving/testbed UX. A repo-local hidden testbed UI **does** belong here, but only as a proving surface for this vendor package rather than as product-facing AeroBeat UX. Those product-facing authoring/import/runtime responsibilities still fit better in later importer/converter/runtime/tool repos.
 
 Repo shape should follow the current AeroBeat package convention: sharable package code at the root, hidden proving project under `/.testbed/`, and explicit GodotEnv dependencies via `.testbed/addons.jsonc`. Unlike vendored raw-plugin lanes such as `aerobeat-vendor-gdgs`, this BeatSaver repo should begin as a **support package mounted from the repo root** rather than a third-party payload mirrored under `src/` (`REF-02`, `REF-03`, `REF-04`, `REF-05`). The strongest initial slice is a deterministic read-only client plus acquisition/staging seam that can hand a selected BeatSaver ZIP and a normalized manifest to later authoring/import tooling. The hidden testbed's goal is to showcase the provider API fully via a searchable, filterable catalog UI: search results should render as clickable image/name cards, selecting a card should reveal a right-side detail panel with richer metadata, and a large CTA download button should stage the selected map ZIP into `/.testbed/.artifacts/` for local testing only.
 
@@ -271,14 +271,20 @@ This slice also refined the clean Task 5 seam: the next step should consume `sta
 
 **Files Created/Deleted/Modified:**
 - `.testbed/project.godot`
-- `.testbed/scenes/*`
-- `.testbed/scripts/*`
-- `.testbed/tests/*`
-- `.gitignore`
+- `.testbed/scenes/beatsaver_browser_testbed.tscn`
+- `.testbed/scenes/beatsaver_result_card.tscn`
+- `.testbed/scripts/beatsaver_browser_testbed.gd`
+- `.testbed/scripts/beatsaver_remote_image.gd`
+- `.testbed/scripts/beatsaver_result_card.gd`
+- `.testbed/scripts/beatsaver_testbed_state.gd`
+- `.testbed/scripts/validate_beatsaver_client_slice.gd`
+- `README.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending execution.
+**Results:** Built the hidden proving surface as a basic but truthful BeatSaver browser under `.testbed/scenes/beatsaver_browser_testbed.tscn` (`REF-02`, `REF-03`). The scene now boots by default in `.testbed/project.godot`, queries the existing vendor facade for either latest maps or text search, applies local text/tag filters over normalized search text/tags, and renders clickable result cards with a real image slot + map naming metadata. Selecting a card resolves provider detail through the facade and reveals a persistent right-side detail panel with uploader/song/map metadata, version selection, and a large CTA that stages the selected ZIP via `BeatSaverVendorFacade.stage_selected_version_artifact(...)` into the already-gitignored `.testbed/.artifacts/` cache.
+
+To keep the proving seam deterministic and headless-testable, the UI state machine was split into `.testbed/scripts/beatsaver_testbed_state.gd`, while the scene script stays focused on binding controls and rendering. The existing validator was extended rather than replaced: `.testbed/scripts/validate_beatsaver_client_slice.gd` now covers request building, parser behavior, façade search/detail/latest calls, package staging/manifesting, state-level latest/search/filter/select/download flows, and a scene smoke pass that instantiates the browser scene, verifies card rendering, simulates result selection, and triggers the download CTA against a synthetic ZIP fixture. Headless coverage proves the normalized UI/data flow and local staging contract; what remains for QA is a human/editor pass on live network image loading, visual layout feel, and real BeatSaver interactive browsing inside the opened `.testbed` project.
 
 ---
 
@@ -299,7 +305,7 @@ This slice also refined the clean Task 5 seam: the next step should consume `sta
 
 **Status:** ⏳ Pending
 
-**Results:** Pending execution. Initial stance now sharpened: this repo should output normalized provider records + a staged source-package manifest, while actual Boxing/Flow semantic transformation should live in a downstream importer/converter lane or AeroBeat authoring tool layer.
+**Results:** Pending execution. Boundary is now explicit: this repo should output normalized provider records + a staged source-package manifest only. Boxing/Flow semantic transformation is out of scope here and will live in a future separate repo.
 
 ---
 
@@ -327,7 +333,7 @@ This slice also refined the clean Task 5 seam: the next step should consume `sta
 
 **Status:** ⚠️ Partial
 
-**What We Built:** A new `aerobeat-vendor-beatsaver` support package scaffold plus two implemented seams: (1) a read-only BeatSaver client for search/detail/latest metadata and (2) a first artifact-acquisition seam that stages selected version ZIPs into `.testbed/.artifacts/`, inspects archive contents, and emits normalized source-material manifests for downstream conversion work. The proving UI, independent conversion handoff notes, QA, and audit remain for later tasks.
+**What We Built:** A new `aerobeat-vendor-beatsaver` support package scaffold plus three implemented seams: (1) a read-only BeatSaver client for search/detail/latest metadata, (2) a first artifact-acquisition seam that stages selected version ZIPs into `.testbed/.artifacts/`, inspects archive contents, and emits normalized source-material manifests for downstream conversion work, and (3) a hidden `.testbed` proving browser that exercises search/latest/detail/filtering/version-selection/download staging against that seam. Independent conversion handoff notes, QA, and audit remain for later tasks.
 
 **Reference Check:**
 - `REF-01` reviewed for concrete BeatSaver endpoint coverage and payload fields.
