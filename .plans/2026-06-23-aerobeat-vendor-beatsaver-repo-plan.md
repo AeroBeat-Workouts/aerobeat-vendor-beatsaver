@@ -1,9 +1,9 @@
 # AeroBeat Vendor BeatSaver
 
 **Date:** 2026-06-23  
-**Status:** Blocked  
-**Last Updated:** 2026-06-23 08:31 EDT  
-**Blocked Reason:** Search compatibility patch is landed; waiting on QA to rerun the live latest/search/detail/download pass and then audit.  
+**Status:** In Progress  
+**Last Updated:** 2026-06-23 08:28 EDT  
+**Blocked Reason:** Independent audit found the implementation slice is clean, but the active plan still has pending Task 6 / bead `openclaw-pico-bpm`, so the plan is not yet fully complete for closeout.  
 **Agent:** `pico`
 
 ---
@@ -303,9 +303,9 @@ To keep the proving seam deterministic and headless-testable, the UI state machi
 **Files Created/Deleted/Modified:**
 - conversion contract notes / README sections / source interface files
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete (explicitly descoped from this repo)
 
-**Results:** Pending execution. Boundary is now explicit: this repo should output normalized provider records + a staged source-package manifest only. Boxing/Flow semantic transformation is out of scope here and will live in a future separate repo.
+**Results:** Derrick explicitly clarified on 2026-06-23 that Boxing/Flow conversion should **not** happen in `aerobeat-vendor-beatsaver` and instead belongs in a future separate repo. That decision resolves this task without additional implementation inside the current repo. The handoff seam for this repo is therefore now fixed and complete: it stops at normalized provider records plus staged source-package manifests in `.testbed/.artifacts/`, with no authored-chart conversion, no `workout.yaml` generation, and no gameplay-semantic transformation here.
 
 ---
 
@@ -323,7 +323,7 @@ To keep the proving seam deterministic and headless-testable, the UI state machi
 **Files Created/Deleted/Modified:**
 - QA logs / plan updates / final repo files
 
-**Status:** ❌ Failed
+**Status:** ✅ QA + audit complete; human review feedback pending
 
 **Results:** QA executed on 2026-06-23 and found one real live-provider blocker, so this bead should stay open for a coder follow-up before independent audit.
 
@@ -369,13 +369,40 @@ Coder follow-up on 2026-06-23:
   - rerun direct search reproduction with `curl -sS 'https://api.beatsaver.com/search/text/0?q=fitbeat&pageSize=12&order=Relevance'`
   - rerun the existing latest/detail/download checks to confirm this fix did not regress those already-good seams
 
+QA retry on 2026-06-23 after commit `0afb9c9`:
+- Exact commands run during the retry:
+  - `godot --headless --path .testbed -s res://scripts/validate_beatsaver_client_slice.gd`
+  - `godot --headless --path .testbed -s /home/derrick/.openclaw/workspace/.temp/beatsaver_live_qa.gd`
+  - `curl -sS -D /tmp/beatsaver-search-headers.txt 'https://api.beatsaver.com/search/text/0?q=fitbeat&pageSize=12&order=Relevance' -o /tmp/beatsaver-search-body.json`
+  - `curl -sS -D /tmp/beatsaver-latest-headers.txt 'https://api.beatsaver.com/maps/latest?pageSize=2' -o /tmp/beatsaver-latest-body.json`
+  - `find .testbed/.artifacts -maxdepth 6 -type f | sort`
+  - `git check-ignore -v .testbed/.artifacts .testbed/.artifacts/qa_live .testbed/.artifacts/validation .testbed/.artifacts/validation_ui`
+  - `git status --short --ignored .testbed/.artifacts`
+- What passed in the retry:
+  - Repo-local deterministic validation still passed end-to-end after the search fix.
+  - Live provider search now succeeds through the Godot package seam and direct provider reproduction. The live Godot harness returned `LIVE_SEARCH_COUNT=12`, and direct `curl` to `order=Relevance` returned HTTP 200 with 12 docs for `fitbeat`.
+  - Latest/detail/download staging did not regress. The live harness still resolved latest map `524BB`, fetched populated detail metadata for uploader `Comyute`, and staged a real ZIP plus `source_material_manifest.json` under `.testbed/.artifacts/qa_live/524bb/41921e46fa7b4b0d28085401af6a603bcae6f040/`.
+  - The staged manifest remained sane on the live artifact: `Info.dat` present, one audio file detected, three difficulty files detected, and six archive entries reported.
+  - `.testbed/.artifacts/` remains gitignored/local-only. `git check-ignore -v` still resolves to `.gitignore:33:.testbed/.artifacts/`, and `git status --short --ignored .testbed/.artifacts` still reports only `!! .testbed/.artifacts/`.
+- QA retry disposition:
+  - **Ready for independent audit.** The concrete live search blocker is resolved and the latest/detail/download/staging seams remained healthy on rerun.
+  - Residual risk is limited to manual visual polish/live interaction details that were not fully screen-verified under Wayland capture restrictions (remote cover-image timing, card/detail layout feel, CTA ergonomics), not to the provider contract or artifact-staging seam.
+- Independent audit on 2026-06-23:
+  - Verified repo boundary against `REF-01`, `REF-06`, `REF-07`, `REF-08`, and `REF-10` by inspecting `README.md`, `src/`, and `.testbed/`. The published code stays on the provider side: request building, HTTP transport, response parsing, selected-version ZIP staging, archive inspection, manifest emission, and proving UX. No `plugin.cfg` exists, and no Boxing/Flow conversion, `workout.yaml` generation, or AeroBeat runtime semantics were added.
+  - Verified the hidden testbed contract is present and wired correctly: `.testbed/addons.jsonc` mounts this repo from `..` with only `aerobeat-tool-headless-manager` and `aerobeat-vendor-godot-unit-test`; `.testbed/project.godot` boots the hidden browser scene; the scene/scripts expose the expected result-card -> detail-panel -> version-select -> download-CTA flow; and the facade method used by the CTA is `stage_selected_version_artifact(...)`.
+  - Verified `.testbed/.artifacts/` remains local-only through `.gitignore` plus direct `git check-ignore -v` / `git status --short --ignored .testbed/.artifacts` spot checks.
+  - Verified the search compatibility fix is really present in code and tests: `src/models/beatsaver_search_query.gd` now emits `order=<TitleCase enum>` and `.testbed/scripts/validate_beatsaver_client_slice.gd` explicitly asserts `order=Latest` and the absence of legacy `sortOrder`.
+  - Verified current validation evidence is credible: `godot --headless --path .testbed -s res://scripts/validate_beatsaver_client_slice.gd` passed during audit, and direct provider reproduction of `https://api.beatsaver.com/search/text/0?q=fitbeat&pageSize=12&order=Relevance` returned HTTP 200 with 12 docs.
+  - Verified published repo state / commits make sense for the implementation slice: `origin/main` is at `0afb9c9`, with the expected seam commits `693a647`, `bb2f103`, `dfbb5a6`, and `0afb9c9` in order.
+  - Exact completion gap at audit time was Task 6 / bead `openclaw-pico-bpm` still being marked pending in markdown + Beads even though Derrick had already decided conversion belongs in a future separate repo. That gap is now resolved by explicitly descoping conversion out of this repo and fixing the plan to stop at provider records + staged source-material manifests.
+
 ---
 
 ## Final Results
 
-**Status:** ❌ Blocked
+**Status:** ⚠️ Review-ready — implementation, QA, and audit passed; final closeout is intentionally paused for Derrick's screenshot/UI feedback before the plan is formally closed
 
-**What We Built:** A new `aerobeat-vendor-beatsaver` support package scaffold plus three implemented seams: (1) a read-only BeatSaver client for search/detail/latest metadata, (2) a first artifact-acquisition seam that stages selected version ZIPs into `.testbed/.artifacts/`, inspects archive contents, and emits normalized source-material manifests for downstream conversion work, and (3) a hidden `.testbed` proving browser that exercises search/latest/detail/filtering/version-selection/download staging against that seam. QA originally found a real live-provider search failure; coder follow-up has now patched the search request shape to match the current provider contract (`order=<TitleCase enum>` instead of legacy `sortOrder=<lowercase>`), and deterministic + live smoke validation passed. Independent conversion handoff notes plus a post-fix QA/audit pass still remain.
+**What We Built:** A new `aerobeat-vendor-beatsaver` support package scaffold plus three implemented seams: (1) a read-only BeatSaver client for search/detail/latest metadata, (2) a first artifact-acquisition seam that stages selected version ZIPs into `.testbed/.artifacts/`, inspects archive contents, and emits normalized source-material manifests for downstream future-repo conversion work, and (3) a hidden `.testbed` proving browser that exercises search/latest/detail/filtering/version-selection/download staging against that seam. QA originally found a real live-provider search failure; coder follow-up patched the search request shape to match the current provider contract (`order=<TitleCase enum>` instead of legacy `sortOrder=<lowercase>`), and the retry QA pass confirmed live search/latest/detail/download staging now all pass again. Independent audit confirmed the implemented repo slice is boundary-correct and review-ready. Conversion is now explicitly descoped from this repo into a future separate repo, and final plan closeout is being held only so Derrick can review the screenshot/UI and give feedback before formal closure.
 
 **Reference Check:**
 - `REF-01` reviewed for concrete BeatSaver endpoint coverage and payload fields.
@@ -387,6 +414,7 @@ Coder follow-up on 2026-06-23:
 - `da7cea7` - Add initial BeatSaver client seam
 - `bb2f103` - Add BeatSaver artifact staging seam
 - `dfbb5a6` - Add BeatSaver proving testbed browser
+- `0afb9c9` - Fix BeatSaver search query compatibility
 
 **Lessons Learned:**
 - BeatSaver already exposes a rich enough provider surface that this repo can stay narrow: provider reads, selected ZIP acquisition, and normalized staging are enough for the first useful slice.
