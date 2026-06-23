@@ -1,0 +1,40 @@
+# Godot 4+ specific ignores
+.godot/
+.import/
+export_presets.cfg
+
+# Imported translations (automatically generated from CSV files)
+*.translation
+
+# Mono-specific ignores
+.mono/
+data_*/
+mono_crash.*.json
+
+# System specific
+.DS_Store
+Thumbs.db
+.nomedia
+
+# GodotEnv package workbench
+.testbed/addons/
+.testbed/.addons/
+.testbed/.headless/
+
+# Beads / Dolt files
+.dolt/
+*.db
+.beads-credential-key
+
+# Godot UID sidecars
+*.uid
+
+# Local downloaded/staged vendor content
+.testbed/staging/
+.testbed/downloads/
+.testbed/cache/
+
+# Agent/editor leftovers
+.claude/
+CLAUDE.md
+AGENTS.md
