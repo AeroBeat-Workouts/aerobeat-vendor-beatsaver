@@ -284,7 +284,7 @@ This slice also refined the clean Task 5 seam: the next step should consume `sta
 
 **Results:** Built the hidden proving surface as a basic but truthful BeatSaver browser under `.testbed/scenes/beatsaver_browser_testbed.tscn` (`REF-02`, `REF-03`). The scene now boots by default in `.testbed/project.godot`, queries the existing vendor facade for either latest maps or text search, applies local text/tag filters over normalized search text/tags, and renders clickable result cards with a real image slot + map naming metadata. Selecting a card resolves provider detail through the facade and reveals a persistent right-side detail panel with uploader/song/map metadata, version selection, and a large CTA that stages the selected ZIP via `BeatSaverVendorFacade.stage_selected_version_artifact(...)` into the already-gitignored `.testbed/.artifacts/` cache.
 
-To keep the proving seam deterministic and headless-testable, the UI state machine was split into `.testbed/scripts/beatsaver_testbed_state.gd`, while the scene script stays focused on binding controls and rendering. The existing validator was extended rather than replaced: `.testbed/scripts/validate_beatsaver_client_slice.gd` now covers request building, parser behavior, façade search/detail/latest calls, package staging/manifesting, state-level latest/search/filter/select/download flows, and a scene smoke pass that instantiates the browser scene, verifies card rendering, simulates result selection, and triggers the download CTA against a synthetic ZIP fixture. Headless coverage proves the normalized UI/data flow and local staging contract; what remains for QA is a human/editor pass on live network image loading, visual layout feel, and real BeatSaver interactive browsing inside the opened `.testbed` project.
+To keep the proving seam deterministic and headless-testable, the UI state machine was split into `.testbed/scripts/beatsaver_testbed_state.gd`, while the scene script stays focused on binding controls and rendering. The existing validator was extended rather than replaced: `.testbed/scripts/validate_beatsaver_client_slice.gd` now covers request building, parser behavior, façade search/detail/latest calls, package staging/manifesting, state-level latest/search/filter/select/download flows, and a scene smoke pass that instantiates the browser scene, verifies card rendering, simulates result selection, and triggers the download CTA against a synthetic ZIP fixture. Headless coverage proves the normalized UI/data flow and local staging contract; what remains for QA is a human/editor pass on live network image loading, visual layout feel, and real BeatSaver interactive browsing inside the opened `.testbed` project. Implementation landed in commit `dfbb5a6` and was pushed to `origin/main`.
 
 ---
 
@@ -343,7 +343,8 @@ To keep the proving seam deterministic and headless-testable, the UI state machi
 
 **Commits:**
 - `da7cea7` - Add initial BeatSaver client seam
-- No remote configured in this repo, so push is not available yet
+- `bb2f103` - Add BeatSaver artifact staging seam
+- `dfbb5a6` - Add BeatSaver proving testbed browser
 
 **Lessons Learned:**
 - BeatSaver already exposes a rich enough provider surface that this repo can stay narrow: provider reads, selected ZIP acquisition, and normalized staging are enough for the first useful slice.
