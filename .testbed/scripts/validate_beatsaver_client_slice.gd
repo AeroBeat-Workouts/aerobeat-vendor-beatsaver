@@ -99,7 +99,8 @@ func _validate_request_builder(builder: BeatSaverRequestBuilder) -> void:
 	_assert(search_request.path == "/search/text/2", "search path should target page 2")
 	_assert(search_request.query.get("q", "") == "fitbeat", "search query should include text")
 	_assert(int(search_request.query.get("pageSize", 0)) == 10, "search pageSize should be preserved")
-	_assert(search_request.query.get("sortOrder", "") == "latest", "search sort order should be preserved")
+	_assert(search_request.query.get("order", "") == "Latest", "search order should use the provider's TitleCase enum")
+	_assert(not search_request.query.has("sortOrder"), "search request should not use the legacy sortOrder parameter")
 	_assert(search_request.query.get("automapper", true) == false, "search automapper should be preserved")
 
 	var detail_request := builder.build_map_detail_by_id_request("1")

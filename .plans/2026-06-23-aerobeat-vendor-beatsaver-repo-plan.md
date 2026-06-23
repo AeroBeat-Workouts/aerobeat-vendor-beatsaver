@@ -1,9 +1,9 @@
 # AeroBeat Vendor BeatSaver
 
 **Date:** 2026-06-23  
-**Status:** In Progress  
-**Last Updated:** 2026-06-23 08:28 EDT  
-**Blocked Reason:** None  
+**Status:** Blocked  
+**Last Updated:** 2026-06-23 08:31 EDT  
+**Blocked Reason:** Search compatibility patch is landed; waiting on QA to rerun the live latest/search/detail/download pass and then audit.  
 **Agent:** `pico`
 
 ---
@@ -323,17 +323,59 @@ To keep the proving seam deterministic and headless-testable, the UI state machi
 **Files Created/Deleted/Modified:**
 - QA logs / plan updates / final repo files
 
-**Status:** ⏳ Pending
+**Status:** ❌ Failed
 
-**Results:** Pending execution.
+**Results:** QA executed on 2026-06-23 and found one real live-provider blocker, so this bead should stay open for a coder follow-up before independent audit.
+
+Exact commands run during QA:
+- `bd update openclaw-pico-97l --status in_progress --json` (from `/home/derrick/.openclaw/workspace/projects/openclaw-pico`)
+- `godot --version`
+- `godot --headless --path .testbed -s res://scripts/validate_beatsaver_client_slice.gd`
+- `git check-ignore -v .testbed/.artifacts .testbed/.artifacts/validation .testbed/.artifacts/validation_ui`
+- `find .testbed/.artifacts -maxdepth 4 -type f | sort`
+- live QA harness run via temporary script: `godot --headless --path .testbed -s /home/derrick/.openclaw/workspace/.temp/beatsaver_live_qa.gd`
+- `curl -sS 'https://api.beatsaver.com/search/text/0?q=fitbeat&pageSize=12&sortOrder=relevance'`
+- `curl -sS 'https://api.beatsaver.com/maps/latest?pageSize=2'`
+- `git status --short --ignored .testbed/.artifacts`
+
+What was verified successfully:
+- Repo-local deterministic validation passed end-to-end: request builder expectations, fixture parsing, facade search/detail/latest seams, acquisition/inspection/manifest persistence, testbed state flow, and scene smoke behavior all passed through `.testbed/scripts/validate_beatsaver_client_slice.gd`.
+- `.testbed/.artifacts/` remains gitignored/local-only. `git check-ignore -v` and `git status --ignored` both confirm the ignore rule is active while staged outputs remain on disk.
+- Live BeatSaver **latest** behavior is coherent: the real API returned 12 visible latest results through the package seam.
+- Live BeatSaver **detail** behavior is coherent when selecting a latest result: QA verified a real latest map (`524BB`) resolved into a populated detail view model with title/subtitle/uploader/version metadata plus real cover/preview/download URLs.
+- Live BeatSaver **CTA download/staging** behavior is coherent at the data seam: staging the selected latest result produced a real ZIP and `source_material_manifest.json` under `.testbed/.artifacts/qa_live/524bb/41921e46fa7b4b0d28085401af6a603bcae6f040/`.
+- Live manifest content looked sane for the downloaded package: `Info.dat` was found, one referenced audio file was detected, three referenced difficulty files were detected, and the archive inspector reported six entries.
+
+Blocking failure found:
+- Live BeatSaver **search** is currently broken against the real provider. The repo issues `GET https://api.beatsaver.com/search/text/0?pageSize=12&q=fitbeat&sortOrder=relevance`, and both the Godot live harness and direct `curl` reproduction returned HTTP 500 with provider payload `{ "success": false, "errors": ["Bad request, check parameters"] }`.
+- Because the hidden testbed's browse/search UX depends on this seam, QA cannot truthfully sign off the full latest/search/detail/download flow yet.
+
+Visual / fidelity note:
+- Full manual on-screen visual verification of the Godot UI was only partially achieved. Wayland host screenshot access was denied (`org.freedesktop.DBus.Error.AccessDenied: Screenshot is not allowed`), so QA relied on the highest-fidelity non-invasive checks available here: scene instantiation/signal smoke in Godot, live state-driven latest/detail/download execution, and inspection of the produced staged artifacts.
+- Residual risk remains on purely visual presentation details during live interactive search mode (card layout feel, remote cover-image rendering timing, right-panel appearance polish, and manual CTA ergonomics), separate from the concrete live search API failure above.
+
+QA disposition:
+- **Not ready for independent audit yet.** The coder should fix the live search request compatibility issue first, then QA should rerun the same latest/search/detail/download pass including a live manual visual check if desktop capture/control becomes available.
+
+Coder follow-up on 2026-06-23:
+- Root cause confirmed against `REF-01` plus live provider behavior: this repo was still sending the legacy search query shape `sortOrder=relevance` with lower-case enum values, but the current `/search/text/{page}` endpoint accepts `order=<TitleCase enum>` (for example `order=Relevance`). The old request shape reproduced the provider's HTTP 500 `Bad request, check parameters`; the corrected shape returned HTTP 200 with 12 docs for `fitbeat`.
+- Patched `src/models/beatsaver_search_query.gd` so search requests now emit `order` instead of `sortOrder` and normalize supported values to the provider's accepted TitleCase enum strings (`Latest`, `Relevance`, `Rating`, `Curated`, plus `Random`/`Duration` for parity with the documented endpoint).
+- Expanded `.testbed/scripts/validate_beatsaver_client_slice.gd` so deterministic validation now explicitly asserts that request building uses `order=Latest` and no longer emits the legacy `sortOrder` parameter.
+- Coder validation after the patch:
+  - `godot --headless --path .testbed -s res://scripts/validate_beatsaver_client_slice.gd`
+  - live provider smoke via `python3`/`urllib`: `https://api.beatsaver.com/search/text/0?q=fitbeat&pageSize=12&order=Relevance` → HTTP 200 with 12 docs
+- QA retry guidance:
+  - rerun `godot --headless --path .testbed -s /home/derrick/.openclaw/workspace/.temp/beatsaver_live_qa.gd`
+  - rerun direct search reproduction with `curl -sS 'https://api.beatsaver.com/search/text/0?q=fitbeat&pageSize=12&order=Relevance'`
+  - rerun the existing latest/detail/download checks to confirm this fix did not regress those already-good seams
 
 ---
 
 ## Final Results
 
-**Status:** ⚠️ Partial
+**Status:** ❌ Blocked
 
-**What We Built:** A new `aerobeat-vendor-beatsaver` support package scaffold plus three implemented seams: (1) a read-only BeatSaver client for search/detail/latest metadata, (2) a first artifact-acquisition seam that stages selected version ZIPs into `.testbed/.artifacts/`, inspects archive contents, and emits normalized source-material manifests for downstream conversion work, and (3) a hidden `.testbed` proving browser that exercises search/latest/detail/filtering/version-selection/download staging against that seam. Independent conversion handoff notes, QA, and audit remain for later tasks.
+**What We Built:** A new `aerobeat-vendor-beatsaver` support package scaffold plus three implemented seams: (1) a read-only BeatSaver client for search/detail/latest metadata, (2) a first artifact-acquisition seam that stages selected version ZIPs into `.testbed/.artifacts/`, inspects archive contents, and emits normalized source-material manifests for downstream conversion work, and (3) a hidden `.testbed` proving browser that exercises search/latest/detail/filtering/version-selection/download staging against that seam. QA originally found a real live-provider search failure; coder follow-up has now patched the search request shape to match the current provider contract (`order=<TitleCase enum>` instead of legacy `sortOrder=<lowercase>`), and deterministic + live smoke validation passed. Independent conversion handoff notes plus a post-fix QA/audit pass still remain.
 
 **Reference Check:**
 - `REF-01` reviewed for concrete BeatSaver endpoint coverage and payload fields.

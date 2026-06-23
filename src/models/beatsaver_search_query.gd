@@ -32,7 +32,7 @@ func to_query_parameters() -> Dictionary:
 		"pageSize": page_size
 	}
 	if not sort_order.is_empty():
-		query["sortOrder"] = sort_order
+		query["order"] = sort_order
 	if typeof(automapper) == TYPE_BOOL:
 		query["automapper"] = automapper
 	if not tags.is_empty():
@@ -52,7 +52,17 @@ func to_dictionary() -> Dictionary:
 func _sanitize_sort_order(raw_sort_order: String) -> String:
 	var candidate := raw_sort_order.strip_edges().to_lower()
 	match candidate:
-		"latest", "relevance", "rating", "curated":
-			return candidate
+		"latest":
+			return "Latest"
+		"relevance":
+			return "Relevance"
+		"rating":
+			return "Rating"
+		"curated":
+			return "Curated"
+		"random":
+			return "Random"
+		"duration":
+			return "Duration"
 		_:
 			return ""
