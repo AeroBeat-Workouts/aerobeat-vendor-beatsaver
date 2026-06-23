@@ -1,9 +1,9 @@
 # AeroBeat Vendor BeatSaver
 
 **Date:** 2026-06-23  
-**Status:** In Progress  
-**Last Updated:** 2026-06-23 10:46 EDT  
-**Blocked Reason:** None. Task 8 implements the final human-review follow-up fix; repo is ready for final QA/audit closeout.  
+**Status:** Complete  
+**Last Updated:** 2026-06-23 11:05 EDT  
+**Blocked Reason:** None  
 **Agent:** `pico`
 
 ---
@@ -454,9 +454,9 @@ QA closeout note for the orchestrator/auditor: the concrete human-review UI defe
 
 ## Final Results
 
-**Status:** In Progress — implementation complete, ready for final QA/audit closeout
+**Status:** ✅ Complete
 
-**What We Built:** A new `aerobeat-vendor-beatsaver` support package scaffold plus three implemented seams: (1) a read-only BeatSaver client for search/detail/latest metadata, (2) a first artifact-acquisition seam that stages selected version ZIPs into `.testbed/.artifacts/`, inspects archive contents, and emits normalized source-material manifests for downstream future-repo conversion work, and (3) a hidden `.testbed` proving browser that exercises search/latest/detail/filtering/version-selection/download staging against that seam. QA originally found a real live-provider search failure; coder follow-up patched the search request shape to match the current provider contract (`order=<TitleCase enum>` instead of legacy `sortOrder=<lowercase>`), and the retry QA pass confirmed live search/latest/detail/download staging now all pass again. Independent audit confirmed the implemented repo slice is boundary-correct. After Derrick's screenshot review surfaced one last UI defect, Task 8 fixed the result-card layout root cause by replacing the zero-min-width fixed-two-column grid with a bounded adaptive 1–2 column layout and explicit card minimum widths; the truthful live CTA verification was rerun afterward and again staged a real BeatSaver ZIP + manifest into `.testbed/.artifacts/qa_live/...`.
+**What We Built:** A new `aerobeat-vendor-beatsaver` support package scaffold plus four completed seams: (1) a read-only BeatSaver client for search/detail/latest metadata, (2) an artifact-acquisition seam that stages selected version ZIPs into `.testbed/.artifacts/`, inspects archive contents, and emits normalized source-material manifests for downstream future-repo conversion work, (3) a hidden `.testbed` proving browser that exercises search/latest/detail/filtering/version-selection/download staging against that seam, and (4) a final human-review layout fix that keeps the center results grid readable while preserving the CTA-driven live download path. QA originally found a real live-provider search failure; coder follow-up patched the search request shape to match the current provider contract (`order=<TitleCase enum>` instead of legacy `sortOrder=<lowercase>`), and the retry QA pass confirmed live search/latest/detail/download staging all passed again. Independent audit confirmed the implemented repo slice is boundary-correct, and Derrick's final screenshot review approved the corrected UI layout before closeout.
 
 **Reference Check:**
 - `REF-01` reviewed for concrete BeatSaver endpoint coverage and payload fields.
@@ -475,6 +475,7 @@ QA closeout note for the orchestrator/auditor: the concrete human-review UI defe
 - The cleanest architecture is `BeatSaver vendor repo -> staged source-material manifest -> downstream AeroBeat importer/converter/tooling`, not a monolith that also owns Boxing/Flow conversion.
 - The target repo should be created before the plan migrates there; until then, the coordination plan belongs in `openclaw-pico`.
 - A premature `plugin.cfg`/singleton would teach the wrong dependency pattern. First slice should stay a plain support package unless a later consumer seam proves a stable public facade is worth shipping.
+- Human screenshot review matters even after headless QA/audit: the result-card sliver bug only surfaced clearly once Derrick inspected the rendered scene on mobile, and the final closeout now includes explicit screenshot approval plus a re-verification of the live CTA download path.
 
 ---
 
