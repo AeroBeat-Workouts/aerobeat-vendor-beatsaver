@@ -80,10 +80,23 @@ func to_dictionary() -> Dictionary:
 		"level_author_name": level_author_name,
 		"bpm": bpm,
 		"duration_seconds": duration_seconds,
+		"duration_minutes": duration_minutes(),
 		"uploader": uploader.duplicate(true),
+		"uploader_name": uploader_name(),
 		"stats": stats.duplicate(true),
 		"versions": normalized_versions,
+		"version_count": versions.size(),
 		"latest_version": latest_version.to_dictionary() if latest_version != null else {},
+		"primary_hash": primary_hash(),
+		"primary_download_url": primary_download_url(),
+		"cover_image_url": cover_image_url(),
+		"preview_audio_url": preview_audio_url(),
+		"card_title": card_title(),
+		"card_subtitle": card_subtitle(),
+		"card_image_url": card_image_url(),
+		"detail_title": detail_title(),
+		"detail_subtitle": detail_subtitle(),
+		"search_text": search_text(),
 		"created_at": created_at,
 		"updated_at": updated_at,
 		"uploaded_at": uploaded_at,
@@ -99,6 +112,62 @@ func to_dictionary() -> Dictionary:
 
 func primary_hash() -> String:
 	return latest_version.hash if latest_version != null else ""
+
+func primary_download_url() -> String:
+	return latest_version.download_url if latest_version != null else ""
+
+func cover_image_url() -> String:
+	return latest_version.cover_url if latest_version != null else ""
+
+func preview_audio_url() -> String:
+	return latest_version.preview_url if latest_version != null else ""
+
+func uploader_name() -> String:
+	return str(uploader.get("name", ""))
+
+func card_title() -> String:
+	if not song_name.is_empty():
+		return song_name
+	return map_name
+
+func card_subtitle() -> String:
+	var parts: PackedStringArray = []
+	if not level_author_name.is_empty():
+		parts.append(level_author_name)
+	if not uploader_name().is_empty() and uploader_name() != level_author_name:
+		parts.append(uploader_name())
+	return " • ".join(parts)
+
+func card_image_url() -> String:
+	return cover_image_url()
+
+func detail_title() -> String:
+	return map_name if not map_name.is_empty() else card_title()
+
+func detail_subtitle() -> String:
+	var parts: PackedStringArray = []
+	if not song_author_name.is_empty():
+		parts.append(song_author_name)
+	if not level_author_name.is_empty():
+		parts.append(level_author_name)
+	return " • ".join(parts)
+
+func search_text() -> String:
+	var parts: PackedStringArray = []
+	for value in [map_name, song_name, song_sub_name, song_author_name, level_author_name, uploader_name(), map_id]:
+		var text := str(value).strip_edges()
+		if not text.is_empty():
+			parts.append(text)
+	for tag in tags:
+		var normalized_tag := str(tag).strip_edges()
+		if not normalized_tag.is_empty():
+			parts.append(normalized_tag)
+	return " ".join(parts)
+
+func duration_minutes() -> float:
+	if duration_seconds <= 0:
+		return 0.0
+	return float(duration_seconds) / 60.0
 
 func _normalize_uploader(payload: Dictionary) -> Dictionary:
 	return {

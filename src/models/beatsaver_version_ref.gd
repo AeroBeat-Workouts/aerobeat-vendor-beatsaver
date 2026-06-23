@@ -42,6 +42,10 @@ func to_dictionary() -> Dictionary:
 		"cover_url": cover_url,
 		"preview_url": preview_url,
 		"sage_score": sage_score,
+		"difficulty_count": difficulties.size(),
 		"difficulties": normalized_difficulties,
 		"raw": raw.duplicate(true)
 	}
+
+func has_media_assets() -> bool:
+	return not cover_url.is_empty() or not preview_url.is_empty()

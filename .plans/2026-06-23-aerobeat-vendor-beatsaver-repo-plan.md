@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-23  
 **Status:** In Progress  
-**Last Updated:** 2026-06-23 06:52 EDT  
+**Last Updated:** 2026-06-23 06:56 EDT  
 **Blocked Reason:** None  
 **Agent:** `pico`
 
@@ -206,7 +206,7 @@ Use these IDs later in execution prompts, QA notes, and audit notes.
 
 **Status:** ✅ Complete
 
-**Results:** Implemented the first sharable read-only BeatSaver vendor seam under `src/` (`REF-01`, `REF-07`, `REF-08`) with a narrow facade, isolated request builder, isolated HTTP client, isolated response parser, and typed-ish normalized models for map detail, versions, and difficulties. The public surface now covers search by text/page, map detail by id, map detail by hash, and latest-map enumeration. Normalized outputs expose uploader fields, map/song metadata, timestamps, tags, stats, and version download/preview/cover URLs while preserving raw provider payloads for downstream seams when useful.
+**Results:** Implemented the first sharable read-only BeatSaver vendor seam under `src/` (`REF-01`, `REF-07`, `REF-08`) with a narrow facade, isolated request builder, isolated HTTP client, isolated response parser, and typed-ish normalized models for map detail, versions, and difficulties. The public surface now covers search by text/page, map detail by id, map detail by hash, and latest-map enumeration. Normalized outputs expose uploader fields, map/song metadata, timestamps, tags, stats, and version download/preview/cover URLs while preserving raw provider payloads for downstream seams when useful. After Derrick clarified the hidden `.testbed` goal, Task 3 was further shaped to expose future Task 5 catalog/detail fields cleanly: `card_title`, `card_subtitle`, `card_image_url`, `detail_title`, `detail_subtitle`, `search_text`, `uploader_name`, `cover_image_url`, `preview_audio_url`, and `primary_download_url` are now available through the normalized map/detail seam without pulling ZIP acquisition into this slice.
 
 Validation for this slice is deterministic and fixture-friendly: committed truthful lightweight JSON fixtures were sourced from live BeatSaver API responses and trimmed to metadata-only examples, then exercised through `.testbed/scripts/validate_beatsaver_client_slice.gd`. That headless script verifies request construction, fixture parsing, and end-to-end facade behavior using an injected fake transport instead of live network calls. To keep validation repo-local before the future testbed/UI slice lands, `.testbed/project.godot` was also simplified so it does not depend on currently uninstalled generated addons/autoload state just to run this seam check.
 
