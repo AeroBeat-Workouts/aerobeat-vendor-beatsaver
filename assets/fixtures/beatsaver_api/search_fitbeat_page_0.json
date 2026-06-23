@@ -1,0 +1,310 @@
+{
+  "docs": [
+    {
+      "automapper": false,
+      "blQualified": false,
+      "blRanked": false,
+      "bookmarked": false,
+      "createdAt": "2025-04-13T15:22:56.734342Z",
+      "curatedAt": "2025-05-03T14:05:26.809436Z",
+      "curator": {
+        "admin": false,
+        "avatar": "https://cdn.beatsaver.com/avatar/4f2ff2deae6c35948aa218eca3eefca4a0ba5fb0.png",
+        "curator": true,
+        "curatorTab": true,
+        "id": 168973,
+        "name": "RhythmShade",
+        "playlistUrl": "https://api.beatsaver.com/users/id/168973/playlist",
+        "seniorCurator": true,
+        "type": "DISCORD"
+      },
+      "declaredAi": "None",
+      "description": "\"This map also have no squat version\"\n\nI have this song in WIP since last year December (I remember so well cause I was setting up the file before I went on holiday), and since Eggcake already did the map, I just left this song in the WIP, until now... LMAO,  there is no fitbeat version of the song, so I think I just do the fitbeat style map.\n\n- cinema included\n\nExpert+ (Fitbeat) \u2b50 7.24\nExpert+ (Regular) \u2b50 6.86\nExpert (Fitbeat) \u2b50 5.15\nExpert (Regular) \u2b50 4.8",
+      "id": "461fa",
+      "lastPublishedAt": "2025-04-13T15:26:59.932115Z",
+      "metadata": {
+        "bpm": 126.0,
+        "duration": 184,
+        "levelAuthorName": "Bellus",
+        "songAuthorName": "aespa",
+        "songName": "[Fitbeat] Whiplash",
+        "songSubName": ""
+      },
+      "name": "[Fitbeat] aespa - Whiplash",
+      "qualified": false,
+      "ranked": false,
+      "stats": {
+        "downloads": 0,
+        "downvotes": 8,
+        "plays": 0,
+        "reviews": 1,
+        "score": 0.9592,
+        "upvotes": 346
+      },
+      "tags": [
+        "fitness",
+        "balanced",
+        "k-pop",
+        "dance"
+      ],
+      "updatedAt": "2025-06-20T00:22:24.889198Z",
+      "uploaded": "2025-04-13T15:26:59.932114Z",
+      "uploader": {
+        "admin": false,
+        "avatar": "https://cdn.beatsaver.com/avatar/0deb1969cd9c96b3bc5c3821c158b1b23d9550b8.png",
+        "curator": true,
+        "curatorTab": true,
+        "id": 145971,
+        "name": "Bellus",
+        "playlistUrl": "https://api.beatsaver.com/users/id/145971/playlist",
+        "seniorCurator": false,
+        "type": "DISCORD",
+        "verifiedMapper": true
+      },
+      "versions": [
+        {
+          "coverURL": "https://cfcdn.beatsaver.com/0de1befdfe30639c8b0feb6c32db948628690b0e.jpg",
+          "createdAt": "2025-04-13T15:22:56.734342Z",
+          "diffs": [
+            {
+              "bombs": 6,
+              "characteristic": "Standard",
+              "chroma": false,
+              "cinema": true,
+              "difficulty": "Normal",
+              "environment": "BTSEnvironment",
+              "events": 1687,
+              "label": "EX (REGULAR)",
+              "length": 378.5,
+              "maxScore": 633995,
+              "me": false,
+              "ne": false,
+              "njs": 16.0,
+              "notes": 697,
+              "nps": 3.867,
+              "obstacles": 332,
+              "offset": -0.7,
+              "paritySummary": {
+                "errors": 0,
+                "resets": 0,
+                "warns": 0
+              },
+              "seconds": 180.238
+            },
+            {
+              "bombs": 6,
+              "characteristic": "Standard",
+              "chroma": false,
+              "cinema": true,
+              "difficulty": "Hard",
+              "environment": "BTSEnvironment",
+              "events": 1687,
+              "label": "EX (FITBEAT)",
+              "length": 378.5,
+              "maxScore": 633995,
+              "me": false,
+              "ne": false,
+              "njs": 16.0,
+              "notes": 697,
+              "nps": 3.867,
+              "obstacles": 392,
+              "offset": -0.68,
+              "paritySummary": {
+                "errors": 0,
+                "resets": 0,
+                "warns": 0
+              },
+              "seconds": 180.238
+            },
+            {
+              "bombs": 6,
+              "characteristic": "Standard",
+              "chroma": false,
+              "cinema": true,
+              "difficulty": "Expert",
+              "environment": "BTSEnvironment",
+              "events": 2717,
+              "label": "EX+ (REGULAR)",
+              "length": 378.5,
+              "maxScore": 833635,
+              "me": false,
+              "ne": false,
+              "njs": 17.0,
+              "notes": 914,
+              "nps": 5.071,
+              "obstacles": 336,
+              "offset": -0.84,
+              "paritySummary": {
+                "errors": 0,
+                "resets": 0,
+                "warns": 0
+              },
+              "seconds": 180.238
+            },
+            {
+              "bombs": 6,
+              "characteristic": "Standard",
+              "chroma": false,
+              "cinema": true,
+              "difficulty": "ExpertPlus",
+              "environment": "BTSEnvironment",
+              "events": 2717,
+              "label": "EX+ (FITBEAT)",
+              "length": 378.5,
+              "maxScore": 833635,
+              "me": false,
+              "ne": false,
+              "njs": 17.0,
+              "notes": 914,
+              "nps": 5.071,
+              "obstacles": 391,
+              "offset": -0.826,
+              "paritySummary": {
+                "errors": 0,
+                "resets": 0,
+                "warns": 0
+              },
+              "seconds": 180.238
+            }
+          ],
+          "downloadURL": "https://r2cdn.beatsaver.com/0de1befdfe30639c8b0feb6c32db948628690b0e.zip",
+          "hash": "0de1befdfe30639c8b0feb6c32db948628690b0e",
+          "previewURL": "https://cfcdn.beatsaver.com/0de1befdfe30639c8b0feb6c32db948628690b0e.mp3",
+          "sageScore": 1,
+          "state": "Published"
+        }
+      ]
+    },
+    {
+      "automapper": false,
+      "blQualified": false,
+      "blRanked": false,
+      "bookmarked": false,
+      "createdAt": "2023-11-23T16:54:40.194474Z",
+      "curatedAt": "2023-12-07T06:20:08.063616Z",
+      "curator": {
+        "admin": false,
+        "avatar": "https://cdn.beatsaver.com/avatar/91bb7b0510cea647179bc95e032f8a25608b09f1.png",
+        "curator": false,
+        "curatorTab": true,
+        "hash": "5cff0b7498cc5a672c85050e",
+        "id": 58338,
+        "name": "Joetastic",
+        "playlistUrl": "https://api.beatsaver.com/users/id/58338/playlist",
+        "seniorCurator": false,
+        "type": "DISCORD",
+        "verifiedMapper": true
+      },
+      "declaredAi": "None",
+      "description": "This one has another non-Fitbeat Ex+, which features different mapping than the Fitbeat version.\nAll my Fitbeat maps (besides the first one) will have a non-Fitbeat version, providing people (me) with the option (excuse) to not do Fitbeat. :D\n\nTotal of 40 squats, averaging 3.17 seconds per squat.\n\nCan find me on Discord: bellus__\n(Feedback always welcome)",
+      "id": "376df",
+      "lastPublishedAt": "2023-11-24T02:10:57.642894Z",
+      "metadata": {
+        "bpm": 124.0,
+        "duration": 127,
+        "levelAuthorName": "Bellus",
+        "songAuthorName": "Jain",
+        "songName": "[Fitbeat] Makeba",
+        "songSubName": "Ian Asher Remix"
+      },
+      "name": "[Fitbeat] Jain - Makeba",
+      "qualified": false,
+      "ranked": false,
+      "stats": {
+        "downloads": 0,
+        "downvotes": 14,
+        "plays": 0,
+        "reviews": 2,
+        "score": 0.9522,
+        "upvotes": 421
+      },
+      "tags": [
+        "fitness",
+        "dance-style",
+        "pop"
+      ],
+      "updatedAt": "2023-12-07T06:20:08.063616Z",
+      "uploaded": "2023-11-23T16:59:45.398355Z",
+      "uploader": {
+        "admin": false,
+        "avatar": "https://cdn.beatsaver.com/avatar/0deb1969cd9c96b3bc5c3821c158b1b23d9550b8.png",
+        "curator": true,
+        "curatorTab": true,
+        "id": 145971,
+        "name": "Bellus",
+        "playlistUrl": "https://api.beatsaver.com/users/id/145971/playlist",
+        "seniorCurator": false,
+        "type": "DISCORD",
+        "verifiedMapper": true
+      },
+      "versions": [
+        {
+          "coverURL": "https://cfcdn.beatsaver.com/2e664d7e44cea109fe7e0781cb3720d54343c097.jpg",
+          "createdAt": "2023-11-24T02:10:50.767973Z",
+          "diffs": [
+            {
+              "bombs": 0,
+              "characteristic": "Standard",
+              "chroma": false,
+              "cinema": false,
+              "difficulty": "Expert",
+              "environment": "FitBeatEnvironment",
+              "events": 801,
+              "label": "non-Fitbeat (ex+)",
+              "length": 255.5,
+              "maxScore": 428835,
+              "me": false,
+              "ne": false,
+              "njs": 16.0,
+              "notes": 474,
+              "nps": 3.834,
+              "obstacles": 157,
+              "offset": -0.7,
+              "paritySummary": {
+                "errors": 0,
+                "resets": 0,
+                "warns": 0
+              },
+              "seconds": 123.629
+            },
+            {
+              "bombs": 0,
+              "characteristic": "Standard",
+              "chroma": false,
+              "cinema": false,
+              "difficulty": "ExpertPlus",
+              "environment": "FitBeatEnvironment",
+              "events": 801,
+              "label": "Fitbeat (ex+)",
+              "length": 255.5,
+              "maxScore": 433435,
+              "me": false,
+              "ne": false,
+              "njs": 16.0,
+              "notes": 479,
+              "nps": 3.874,
+              "obstacles": 381,
+              "offset": -0.7,
+              "paritySummary": {
+                "errors": 0,
+                "resets": 0,
+                "warns": 0
+              },
+              "seconds": 123.629
+            }
+          ],
+          "downloadURL": "https://r2cdn.beatsaver.com/2e664d7e44cea109fe7e0781cb3720d54343c097.zip",
+          "hash": "2e664d7e44cea109fe7e0781cb3720d54343c097",
+          "previewURL": "https://cfcdn.beatsaver.com/2e664d7e44cea109fe7e0781cb3720d54343c097.mp3",
+          "sageScore": 3,
+          "state": "Published"
+        }
+      ]
+    }
+  ],
+  "info": {
+    "duration": 0.001,
+    "pages": 41,
+    "total": 801
+  }
+}

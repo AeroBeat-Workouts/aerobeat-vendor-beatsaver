@@ -1,0 +1,169 @@
+{
+  "docs": [
+    {
+      "automapper": false,
+      "blQualified": false,
+      "blRanked": false,
+      "bookmarked": false,
+      "createdAt": "2026-06-23T09:27:01.514120Z",
+      "declaredAi": "None",
+      "description": "tuff ahh map",
+      "id": "524b8",
+      "lastPublishedAt": "2026-06-23T09:27:20.443194Z",
+      "metadata": {
+        "bpm": 100.0,
+        "duration": 17,
+        "levelAuthorName": "koty77",
+        "songAuthorName": "tiki tiki tom",
+        "songName": "mi pan zuzuzu",
+        "songSubName": ""
+      },
+      "name": "mi pan zuzuzu",
+      "qualified": false,
+      "ranked": false,
+      "stats": {
+        "downloads": 0,
+        "downvotes": 0,
+        "plays": 0,
+        "score": 0.6129,
+        "upvotes": 1
+      },
+      "tags": [
+        "comedy-meme",
+        "kids-family"
+      ],
+      "updatedAt": "2026-06-23T09:27:20.443194Z",
+      "uploaded": "2026-06-23T09:27:20.443194Z",
+      "uploader": {
+        "admin": false,
+        "avatar": "https://cdn.beatsaver.com/avatar/7902557f39d79afc91231bfca966ed0f46c01f7f.png",
+        "curator": false,
+        "id": 243251,
+        "name": "koty77_",
+        "playlistUrl": "https://api.beatsaver.com/users/id/243251/playlist",
+        "seniorCurator": false,
+        "type": "DISCORD"
+      },
+      "versions": [
+        {
+          "coverURL": "https://cfcdn.beatsaver.com/8e4fe503a9fc8f68b7eec1a2eb67034c6628be48.jpg",
+          "createdAt": "2026-06-23T09:27:01.514120Z",
+          "diffs": [
+            {
+              "bombs": 18,
+              "characteristic": "Standard",
+              "chroma": false,
+              "cinema": false,
+              "difficulty": "ExpertPlus",
+              "environment": "DefaultEnvironment",
+              "events": 0,
+              "length": 23.125,
+              "maxScore": 57155,
+              "me": false,
+              "ne": false,
+              "njs": 20.0,
+              "notes": 70,
+              "nps": 5.045,
+              "obstacles": 12,
+              "offset": 0.0,
+              "paritySummary": {
+                "errors": 0,
+                "resets": 0,
+                "warns": 0
+              },
+              "seconds": 13.875
+            }
+          ],
+          "downloadURL": "https://r2cdn.beatsaver.com/8e4fe503a9fc8f68b7eec1a2eb67034c6628be48.zip",
+          "hash": "8e4fe503a9fc8f68b7eec1a2eb67034c6628be48",
+          "previewURL": "https://cfcdn.beatsaver.com/8e4fe503a9fc8f68b7eec1a2eb67034c6628be48.mp3",
+          "sageScore": 2,
+          "state": "Published"
+        }
+      ]
+    },
+    {
+      "automapper": false,
+      "blQualified": false,
+      "blRanked": false,
+      "bookmarked": false,
+      "createdAt": "2026-06-23T09:04:55.955950Z",
+      "declaredAi": "None",
+      "description": "CRIMSON BULLET (TV Size)\r\n\u6c34\u6a39\u5948\u3005 / Nana Mizuki\r\n\u9b54\u6cd5\u5c11\u5973\u30ea\u30ea\u30ab\u30eb\u306a\u306e\u306f EXCEEDS Gun Blaze Vengeance OP / Magical Girl Lyrical Nanoha EXCEEDS Gun Blaze Vengeance OP https://www.youtube.com/watch?v=4IcEbMCW-FU\r\n\u30d5\u30eb\u30b3\u30f3\u30dc\u52d5\u753b https://youtu.be/ONUFkZngPec\r\n",
+      "id": "524b7",
+      "lastPublishedAt": "2026-06-23T09:05:39.918813Z",
+      "metadata": {
+        "bpm": 190.0,
+        "duration": 88,
+        "levelAuthorName": "Lifinna",
+        "songAuthorName": "Nana Mizuki",
+        "songName": "CRIMSON BULLET",
+        "songSubName": "(TV Size)"
+      },
+      "name": "CRIMSON BULLET (\u9b54\u6cd5\u5c11\u5973\u30ea\u30ea\u30ab\u30eb\u306a\u306e\u306f EXCEEDS Gun Blaze Vengeance OP)",
+      "qualified": false,
+      "ranked": false,
+      "stats": {
+        "downloads": 0,
+        "downvotes": 0,
+        "plays": 0,
+        "score": 0.5,
+        "upvotes": 0
+      },
+      "tags": [
+        "anime",
+        "j-pop"
+      ],
+      "updatedAt": "2026-06-23T09:05:39.918813Z",
+      "uploaded": "2026-06-23T09:05:39.918812Z",
+      "uploader": {
+        "admin": false,
+        "avatar": "https://cdn.beatsaver.com/avatar/336171.jpg",
+        "curator": false,
+        "id": 336171,
+        "name": "Lifinna",
+        "playlistUrl": "https://api.beatsaver.com/users/id/336171/playlist",
+        "seniorCurator": false,
+        "type": "SIMPLE"
+      },
+      "versions": [
+        {
+          "coverURL": "https://cfcdn.beatsaver.com/5b53ecb26c58ff2c7cef8469e784d29e01744e6b.jpg",
+          "createdAt": "2026-06-23T09:04:55.955950Z",
+          "diffs": [
+            {
+              "bombs": 0,
+              "characteristic": "Standard",
+              "chroma": false,
+              "cinema": false,
+              "difficulty": "Expert",
+              "environment": "DefaultEnvironment",
+              "events": 851,
+              "length": 270.25,
+              "maxScore": 318435,
+              "me": false,
+              "ne": false,
+              "njs": 14.0,
+              "notes": 354,
+              "nps": 4.148,
+              "obstacles": 0,
+              "offset": -0.38095212,
+              "paritySummary": {
+                "errors": 0,
+                "resets": 0,
+                "warns": 0
+              },
+              "seconds": 85.342
+            }
+          ],
+          "downloadURL": "https://r2cdn.beatsaver.com/5b53ecb26c58ff2c7cef8469e784d29e01744e6b.zip",
+          "hash": "5b53ecb26c58ff2c7cef8469e784d29e01744e6b",
+          "previewURL": "https://cfcdn.beatsaver.com/5b53ecb26c58ff2c7cef8469e784d29e01744e6b.mp3",
+          "sageScore": 2,
+          "state": "Published"
+        }
+      ]
+    }
+  ],
+  "info": {}
+}

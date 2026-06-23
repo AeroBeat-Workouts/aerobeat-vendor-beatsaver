@@ -1,0 +1,87 @@
+{
+  "automapper": false,
+  "blQualified": false,
+  "blRanked": false,
+  "bookmarked": false,
+  "createdAt": "2018-05-08T14:28:56Z",
+  "declaredAi": "None",
+  "description": "Hard Only / ~330 notes / Event Lighting! / https://soundcloud.com/succducc/me-n-u",
+  "id": "1",
+  "lastPublishedAt": "2023-05-01T07:41:39.423606Z",
+  "metadata": {
+    "bpm": 80.0,
+    "duration": 144,
+    "levelAuthorName": "succducc",
+    "songAuthorName": "",
+    "songName": "me & u",
+    "songSubName": ""
+  },
+  "name": "succducc - me & u",
+  "qualified": false,
+  "ranked": true,
+  "stats": {
+    "downloads": 0,
+    "downvotes": 185,
+    "plays": 0,
+    "reviews": 6,
+    "score": 0.8209,
+    "sentiment": "VERY_POSITIVE",
+    "upvotes": 885
+  },
+  "tags": [
+    "anime",
+    "dance"
+  ],
+  "updatedAt": "2023-05-06T08:08:06.819003Z",
+  "uploaded": "2018-05-08T14:28:56Z",
+  "uploader": {
+    "admin": false,
+    "avatar": "https://www.gravatar.com/avatar/478fa86c8566f6eb5ec4e692c8d88da5cbdce824d3101a5980efcaed6caab58c?d=retro",
+    "curator": false,
+    "hash": "5cff0b7298cc5a672c84e8a3",
+    "id": 48853,
+    "name": "datkami",
+    "playlistUrl": "https://api.beatsaver.com/users/id/48853/playlist",
+    "seniorCurator": false,
+    "type": "SIMPLE"
+  },
+  "versions": [
+    {
+      "coverURL": "https://cfcdn.beatsaver.com/fda568fc27c20d21f8dc6f3709b49b5cc96723be.jpg",
+      "createdAt": "2018-05-08T14:28:56Z",
+      "diffs": [
+        {
+          "bombs": 28,
+          "characteristic": "Standard",
+          "chroma": false,
+          "cinema": false,
+          "difficulty": "Hard",
+          "environment": "TriangleEnvironment",
+          "events": 81,
+          "length": 185.5,
+          "maxScore": 302795,
+          "me": false,
+          "ne": false,
+          "njs": 10.0,
+          "notes": 337,
+          "nps": 2.422,
+          "obstacles": 11,
+          "offset": 0.0,
+          "paritySummary": {
+            "errors": 45,
+            "resets": 1,
+            "warns": 57
+          },
+          "seconds": 69.563,
+          "stars": 3.12
+        }
+      ],
+      "downloadURL": "https://r2cdn.beatsaver.com/fda568fc27c20d21f8dc6f3709b49b5cc96723be.zip",
+      "hash": "fda568fc27c20d21f8dc6f3709b49b5cc96723be",
+      "key": "1",
+      "previewURL": "https://cfcdn.beatsaver.com/fda568fc27c20d21f8dc6f3709b49b5cc96723be.mp3",
+      "sageScore": 4,
+      "state": "Published"
+    }
+  ]
+}
