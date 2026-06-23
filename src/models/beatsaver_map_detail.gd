@@ -169,6 +169,29 @@ func duration_minutes() -> float:
 		return 0.0
 	return float(duration_seconds) / 60.0
 
+func find_version(identifier: String):
+	var normalized := identifier.strip_edges()
+	if normalized.is_empty():
+		return latest_version
+	var by_hash = find_version_by_hash(normalized)
+	if by_hash != null:
+		return by_hash
+	return find_version_by_key(normalized)
+
+func find_version_by_hash(version_hash: String):
+	var normalized := version_hash.strip_edges().to_lower()
+	for version_ref in versions:
+		if version_ref.hash == normalized:
+			return version_ref
+	return null
+
+func find_version_by_key(version_key: String):
+	var normalized := version_key.strip_edges().to_upper()
+	for version_ref in versions:
+		if version_ref.key == normalized:
+			return version_ref
+	return null
+
 func _normalize_uploader(payload: Dictionary) -> Dictionary:
 	return {
 		"id": int(payload.get("id", 0)),

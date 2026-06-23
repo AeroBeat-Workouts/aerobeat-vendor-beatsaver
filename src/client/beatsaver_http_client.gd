@@ -25,16 +25,34 @@ func execute(request: Dictionary, options: Dictionary = {}) -> Dictionary:
 			}
 		}
 
+	var body_bytes: PackedByteArray = raw_result.get("body_bytes", PackedByteArray())
 	var payload = raw_result.get("payload", null)
-	var body := str(raw_result.get("body", ""))
+	var body := str(raw_result.get("body", body_bytes.get_string_from_utf8()))
 	if payload == null:
-		payload = _decode_payload(body, str(final_request.get("expects", "json")))
+		payload = _decode_payload(body_bytes, body, str(final_request.get("expects", "json")))
 	var normalized := normalize_response(int(raw_result.get("status_code", 0)), raw_result.get("headers", {}), payload)
 	normalized["request"] = final_request
-	normalized["raw_body"] = body
+	normalized["raw_body"] = body if str(final_request.get("expects", "json")) != "binary" else ""
+	normalized["raw_body_bytes"] = body_bytes
 	return normalized
 
 func prepare_request(request: Dictionary) -> Dictionary:
+	var explicit_url := str(request.get("url", "")).strip_edges()
+	if not explicit_url.is_empty():
+		var parsed := _parse_url(explicit_url)
+		assert(parsed.get("ok", false))
+		var request_path := str(parsed.get("request_path", "/"))
+		var query_index := request_path.find("?")
+		var path_only := request_path.substr(0, query_index) if query_index >= 0 else request_path
+		return {
+			"method": str(request.get("method", "GET")).to_upper(),
+			"path": path_only,
+			"url": explicit_url,
+			"query": _normalize_query(request.get("query", {})),
+			"headers": _normalize_headers(request.get("headers", {})),
+			"expects": str(request.get("expects", "json")),
+			"base_url": "%s://%s%s" % ["https" if parsed.get("tls", false) else "http", str(parsed.get("host", "")), _port_suffix(parsed)]
+		}
 	var base_url := str(request.get("base_url", "https://api.beatsaver.com")).rstrip("/")
 	var path := _normalize_path(str(request.get("path", "/")))
 	var query := _normalize_query(request.get("query", {}))
@@ -106,7 +124,8 @@ func _execute_with_http_client(final_request: Dictionary, options: Dictionary) -
 	return {
 		"status_code": client.get_response_code(),
 		"headers": _response_headers_to_dictionary(client.get_response_headers()),
-		"body": body_chunks.get_string_from_utf8()
+		"body": body_chunks.get_string_from_utf8(),
+		"body_bytes": body_chunks
 	}
 
 func _wait_for_status(client: HTTPClient, timeout_seconds: float, terminal_statuses: Array) -> bool:
@@ -149,7 +168,9 @@ func _parameter_to_string(value: Variant) -> String:
 		return "true" if value else "false"
 	return str(value)
 
-func _decode_payload(raw_body: String, expects: String) -> Variant:
+func _decode_payload(body_bytes: PackedByteArray, raw_body: String, expects: String) -> Variant:
+	if expects == "binary":
+		return body_bytes
 	if expects != "json":
 		return raw_body
 	var stripped := raw_body.strip_edges()
@@ -197,7 +218,7 @@ func _parse_url(url: String) -> Dictionary:
 		request_path = remainder.substr(slash_index)
 	var host := host_port
 	var port := 443 if scheme == "https" else 80
-	if host_port.contains(":" ):
+	if host_port.contains(":"):
 		var host_parts := host_port.rsplit(":", true, 1)
 		host = host_parts[0]
 		port = int(host_parts[1])
@@ -230,3 +251,10 @@ func _http_method_to_constant(method: String) -> HTTPClient.Method:
 			return HTTPClient.METHOD_DELETE
 		_:
 			return HTTPClient.METHOD_GET
+
+func _port_suffix(parsed: Dictionary) -> String:
+	var port := int(parsed.get("port", 0))
+	var tls := bool(parsed.get("tls", false))
+	if (tls and port == 443) or (not tls and port == 80):
+		return ""
+	return ":%d" % port

@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-23  
 **Status:** In Progress  
-**Last Updated:** 2026-06-23 06:56 EDT  
+**Last Updated:** 2026-06-23 07:14 EDT  
 **Blocked Reason:** None  
 **Agent:** `pico`
 
@@ -225,20 +225,32 @@ Execution refinement revealed a clean Task 4/5 seam split:
 **Prompt:** Add the repo's first artifact-acquisition seam: given a selected BeatSaver version, download the map package into a local/testbed staging area, inspect package contents, and expose a normalized **source-material manifest** needed for later AeroBeat conversion. Wire this so the hidden testbed can trigger downloads from a large CTA button and stage downloaded artifacts under `/.testbed/.artifacts/`. Keep committed fixtures lightweight and legally safe; do not silently vendor third-party song payloads into the repo. Ensure `/.testbed/.artifacts/` is gitignored because it is a local testing cache only. Claim the bead on start and commit/push on completion unless the orchestrator overrides.
 
 **Folders Created/Deleted/Modified:**
-- `src/`
-- `.testbed/.artifacts/`
-- `.testbed/assets/`
+- `src/acquisition/`
+- `src/models/`
+- `.testbed/.artifacts/` (local-only gitignored runtime cache)
+- `.testbed/fixtures/packages/`
 - `.testbed/scripts/`
-- `.testbed/tests/`
 
 **Files Created/Deleted/Modified:**
-- acquisition/parsing source files
-- local lightweight fixtures/manifests
-- test helpers/scripts
+- `src/acquisition/beatsaver_package_fetcher.gd`
+- `src/acquisition/beatsaver_archive_inspector.gd`
+- `src/acquisition/beatsaver_stage_manifest_builder.gd`
+- `src/models/beatsaver_source_package_manifest.gd`
+- `src/facade/beatsaver_vendor_facade.gd`
+- `src/client/beatsaver_http_client.gd`
+- `src/models/beatsaver_map_detail.gd`
+- `.testbed/fixtures/packages/synthetic_training_pack.zip`
+- `.testbed/scripts/validate_beatsaver_client_slice.gd`
+- `.gitignore`
+- `README.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending execution. Output should stop at staged archive facts + manifesting, not AeroBeat chart conversion.
+**Results:** Implemented the first artifact-acquisition seam without crossing into AeroBeat conversion (`REF-01`, `REF-06`). The repo can now resolve a selected BeatSaver version, download its ZIP to a deterministic stage folder under `.testbed/.artifacts/<map-id>/<version-hash>/`, inspect ZIP entries, parse `Info.dat` when present, and emit a normalized `source_material_manifest.json` beside the staged archive for downstream importer/converter work. The public package-facing hook is a narrow facade method, `BeatSaverVendorFacade.stage_selected_version_artifact(...)`, which future hidden testbed UI work can call directly for CTA-driven staging.
+
+Validation stayed repo-local and legal-safe: `.gitignore` now excludes `.testbed/.artifacts/`, no downloaded community payloads were committed, and deterministic coverage uses a tiny synthetic metadata-only ZIP fixture (`.testbed/fixtures/packages/synthetic_training_pack.zip`) rather than third-party map content. The headless validator was expanded so the same script now verifies request building, fixture parsing, facade calls, staged ZIP acquisition, archive inspection, and persisted manifest output in one pass.
+
+This slice also refined the clean Task 5 seam: the next step should consume `stage_selected_version_artifact(...)` from a hidden browse/detail/download proving scene, render the returned manifest/archive facts to the user, and keep all staged artifacts local-only under `.testbed/.artifacts/` rather than inventing any conversion logic here.
 
 ---
 
@@ -315,7 +327,7 @@ Execution refinement revealed a clean Task 4/5 seam split:
 
 **Status:** ⚠️ Partial
 
-**What We Built:** A new `aerobeat-vendor-beatsaver` support package scaffold plus the first implemented read-only BeatSaver client seam: facade, request builder, HTTP client, response parser, normalized map/version/difficulty models, truthful metadata fixtures, and a deterministic headless validation script. ZIP acquisition, archive inspection, proving UI, and conversion handoff remain for later tasks.
+**What We Built:** A new `aerobeat-vendor-beatsaver` support package scaffold plus two implemented seams: (1) a read-only BeatSaver client for search/detail/latest metadata and (2) a first artifact-acquisition seam that stages selected version ZIPs into `.testbed/.artifacts/`, inspects archive contents, and emits normalized source-material manifests for downstream conversion work. The proving UI, independent conversion handoff notes, QA, and audit remain for later tasks.
 
 **Reference Check:**
 - `REF-01` reviewed for concrete BeatSaver endpoint coverage and payload fields.

@@ -30,6 +30,7 @@ Thumbs.db
 *.uid
 
 # Local downloaded/staged vendor content
+.testbed/.artifacts/
 .testbed/staging/
 .testbed/downloads/
 .testbed/cache/
