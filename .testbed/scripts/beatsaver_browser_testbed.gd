@@ -4,6 +4,9 @@ extends Control
 const BeatSaverVendorFacade = preload("res://../src/facade/beatsaver_vendor_facade.gd")
 const BeatSaverTestbedState = preload("res://scripts/beatsaver_testbed_state.gd")
 const RESULT_CARD_SCENE = preload("res://scenes/beatsaver_result_card.tscn")
+const RESULT_CARD_TARGET_WIDTH := 280
+const RESULT_CARD_MAX_COLUMNS := 2
+const RESULTS_GRID_GAP := 12
 
 @export var auto_bootstrap := true
 
@@ -14,6 +17,7 @@ const RESULT_CARD_SCENE = preload("res://scenes/beatsaver_result_card.tscn")
 @onready var _refresh_button: Button = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/RefreshButton
 @onready var _results_summary_label: Label = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/StatusRow/ResultsSummaryLabel
 @onready var _status_label: Label = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/StatusRow/StatusLabel
+@onready var _results_scroll: ScrollContainer = $RootMargin/RootLayout/BodyLayout/ResultsPanel/ResultsMargin/ResultsVBox/ResultsScroll
 @onready var _results_grid: GridContainer = $RootMargin/RootLayout/BodyLayout/ResultsPanel/ResultsMargin/ResultsVBox/ResultsScroll/ResultsGrid
 @onready var _detail_panel: PanelContainer = $RootMargin/RootLayout/BodyLayout/DetailPanel
 @onready var _detail_cover_image = $RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/DetailCoverImage
@@ -31,6 +35,7 @@ func _ready() -> void:
 	if state == null:
 		state = BeatSaverTestbedState.new(BeatSaverVendorFacade.new(), "res://.artifacts")
 	state.state_changed.connect(_render_state)
+	_results_scroll.resized.connect(_on_results_scroll_resized)
 	_query_line_edit.text = state.remote_query_text
 	_filter_line_edit.text = state.local_filter_text
 	_tag_filter_line_edit.text = state.tag_filter_text
@@ -92,6 +97,7 @@ func _render_state() -> void:
 	_query_line_edit.editable = not state.busy
 	_refresh_button.disabled = state.busy
 	_download_button.disabled = state.busy or state.selected_map == null
+	_update_results_grid_columns()
 	_rebuild_results_grid()
 	_render_detail_panel()
 
@@ -104,6 +110,11 @@ func _rebuild_results_grid() -> void:
 		card.button_pressed = map_detail.map_id == state.selected_map_id
 		card.map_chosen.connect(_on_card_chosen)
 		_results_grid.add_child(card)
+
+func _update_results_grid_columns() -> void:
+	var available_width := maxf(_results_scroll.size.x, float(RESULT_CARD_TARGET_WIDTH))
+	var computed_columns := int(floor((available_width + RESULTS_GRID_GAP) / float(RESULT_CARD_TARGET_WIDTH + RESULTS_GRID_GAP)))
+	_results_grid.columns = clampi(computed_columns, 1, RESULT_CARD_MAX_COLUMNS)
 
 func _render_detail_panel() -> void:
 	_detail_panel.visible = state.selected_map != null
@@ -166,3 +177,6 @@ func _results_summary_text() -> String:
 
 func _on_card_chosen(map_id: String) -> void:
 	state.select_map(map_id)
+
+func _on_results_scroll_resized() -> void:
+	_update_results_grid_columns()

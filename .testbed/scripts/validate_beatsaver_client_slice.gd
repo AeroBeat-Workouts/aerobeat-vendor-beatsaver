@@ -249,16 +249,24 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	browser.state = BeatSaverTestbedState.new(fake_facade, VALIDATION_UI_ARTIFACT_ROOT)
 	root.add_child(browser)
 	await process_frame
+	browser.size = Vector2(980, 720)
+	await process_frame
 	browser.state.load_search("fitbeat")
 	await process_frame
 	var results_grid = browser.get_node("RootMargin/RootLayout/BodyLayout/ResultsPanel/ResultsMargin/ResultsVBox/ResultsScroll/ResultsGrid")
 	_assert(results_grid.get_child_count() == browser.state.visible_result_count(), "browser scene should render one card per visible result")
+	_assert(results_grid.columns >= 1 and results_grid.columns <= 2, "results grid should use a bounded adaptive column count")
 	if results_grid.get_child_count() > 0:
-		var first_card = results_grid.get_child(0)
+		var first_card: Control = results_grid.get_child(0)
+		_assert(first_card.custom_minimum_size.x >= 280.0, "result cards should advertise a usable minimum width")
+		_assert(first_card.size.x >= 260.0, "result cards should render wider than a collapsed sliver")
 		first_card.emit_signal("pressed")
 		await process_frame
 		_assert(browser.state.selected_map != null, "pressing a result card should select a map detail")
 		_assert(browser.get_node("RootMargin/RootLayout/BodyLayout/DetailPanel").visible, "selecting a result should reveal the right-side detail panel")
+		await process_frame
+		var selected_card: Control = results_grid.get_child(0)
+		_assert(selected_card.size.x >= 260.0, "result cards should remain readable after the detail panel opens")
 		browser.get_node("RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/DownloadButton").emit_signal("pressed")
 		await process_frame
 		_assert(browser.state.last_download_result.get("ok", false), "download CTA should stage the selected BeatSaver ZIP")

@@ -2,8 +2,8 @@
 
 **Date:** 2026-06-23  
 **Status:** In Progress  
-**Last Updated:** 2026-06-23 08:28 EDT  
-**Blocked Reason:** Independent audit found the implementation slice is clean, but the active plan still has pending Task 6 / bead `openclaw-pico-bpm`, so the plan is not yet fully complete for closeout.  
+**Last Updated:** 2026-06-23 10:46 EDT  
+**Blocked Reason:** None. Task 8 implements the final human-review follow-up fix; repo is ready for final QA/audit closeout.  
 **Agent:** `pico`
 
 ---
@@ -398,11 +398,65 @@ QA retry on 2026-06-23 after commit `0afb9c9`:
 
 ---
 
+### Task 8: Fix human-review UI layout defect and re-verify live CTA download
+
+**Bead ID:** `openclaw-pico-2kg`  
+**SubAgent:** `primary` (for `coder` then `qa`)  
+**Role:** `coder` / `qa`  
+**References:** `REF-01`, `REF-02`, `REF-03`, `REF-04`, `REF-05`  
+**Prompt:** Derrick's screenshot review found that the center results panel is not laying out correctly: thumbnails and names are collapsed into vertical slivers along the left side of the results region instead of rendering as readable cards. Fix the result-card layout/rendering in the hidden `.testbed` browser, then rerun a truthful verification that the CTA download button still fetches a real BeatSaver package and writes the ZIP + manifest into `/.testbed/.artifacts/`. Keep scope narrow: layout/rendering correction plus end-to-end download verification only.
+
+**Folders Created/Deleted/Modified:**
+- `.testbed/scenes/`
+- `.testbed/scripts/`
+- `.testbed/.artifacts/` (runtime verification only)
+
+**Files Created/Deleted/Modified:**
+- `.testbed/scenes/beatsaver_browser_testbed.tscn`
+- `.testbed/scenes/beatsaver_result_card.tscn`
+- `.testbed/scripts/beatsaver_browser_testbed.gd`
+- `.testbed/scripts/beatsaver_result_card.gd`
+- `.testbed/scripts/validate_beatsaver_client_slice.gd`
+- `.plans/2026-06-23-aerobeat-vendor-beatsaver-repo-plan.md`
+
+**Status:** ✅ Complete
+
+**Results:** Human screenshot feedback reproduced a narrow but real layout bug in the hidden `.testbed` browser: the center results grid was hard-coded to `columns = 2` while each `BeatSaverResultCard` advertised effectively zero minimum width (`custom_minimum_size.x = 0`). When the right-side detail panel reduced the available center-pane width, Godot's `GridContainer` compressed the cards to tiny widths, which forced the title/subtitle labels to wrap one character per line and made the thumbnail/name content appear as vertical slivers along the left edge of the panel.
+
+The fix stayed strictly inside the result-card layout seam and preserved the existing detail panel + CTA flow:
+- `.testbed/scenes/beatsaver_result_card.tscn` now gives each card a real minimum footprint (`Vector2(280, 248)`) and horizontal expand/fill flags so the grid cannot collapse a card into a near-zero-width strip.
+- `.testbed/scenes/beatsaver_browser_testbed.tscn` now lets the `ResultsScroll` expand horizontally with the pane.
+- `.testbed/scripts/beatsaver_browser_testbed.gd` now computes an adaptive `ResultsGrid.columns` value from the live scroll width, clamped to `1..2`. That preserves the intended two-column browse layout when space is available while automatically dropping to one readable column when the detail panel or window width would otherwise crush the cards.
+- `.testbed/scripts/validate_beatsaver_client_slice.gd` now asserts the layout contract directly: bounded adaptive column count, card minimum width >= 280 px, and rendered card width >= 260 px both before and after the detail panel opens.
+
+Deterministic validation rerun after the fix:
+- `godot --headless --path .testbed -s res://scripts/validate_beatsaver_client_slice.gd`
+- Result: **passed**.
+
+Truthful live provider verification rerun after the fix:
+- `godot --headless --path .testbed -s /home/derrick/.openclaw/workspace/.temp/beatsaver_live_qa.gd`
+- Result: **passed**.
+- Live evidence captured from the run:
+  - `LIVE_SEARCH_COUNT=12`
+  - `LIVE_LATEST_FIRST_ID=524B6`
+  - `LIVE_DETAIL_HASH=e93accd8cfd9265c80141cead1c74dea2faf70ec`
+  - `LIVE_ARCHIVE_ENTRY_COUNT=8`
+  - `LIVE_INFO_DAT_PATH=Info.dat`
+  - `LIVE_AUDIO_FILE_COUNT=1`
+  - `LIVE_DIFFICULTY_FILE_COUNT=4`
+  - real ZIP written to `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-vendor-beatsaver/.testbed/.artifacts/qa_live/524b6/e93accd8cfd9265c80141cead1c74dea2faf70ec/524b6-e93accd8cfd9.zip`
+  - manifest written to `/home/derrick/.openclaw/workspace/projects/aerobeat/aerobeat-vendor-beatsaver/.testbed/.artifacts/qa_live/524b6/e93accd8cfd9265c80141cead1c74dea2faf70ec/source_material_manifest.json`
+- `.testbed/.artifacts/` remained local-only during the rerun: `git check-ignore -v .testbed/.artifacts .testbed/.artifacts/qa_live` resolved to `.gitignore:33:.testbed/.artifacts/`, and `git status --short --ignored .testbed/.artifacts` still reported only `!! .testbed/.artifacts/`.
+
+QA closeout note for the orchestrator/auditor: the concrete human-review UI defect is fixed, deterministic validation now guards against the sliver regression, and truthful live search/latest/detail/download staging still passes through the same CTA seam after the layout change. This repo should now be considered ready for final QA/audit closeout rather than blocked on additional coder work.
+
+---
+
 ## Final Results
 
-**Status:** ⚠️ Review-ready — implementation, QA, and audit passed; final closeout is intentionally paused for Derrick's screenshot/UI feedback before the plan is formally closed
+**Status:** In Progress — implementation complete, ready for final QA/audit closeout
 
-**What We Built:** A new `aerobeat-vendor-beatsaver` support package scaffold plus three implemented seams: (1) a read-only BeatSaver client for search/detail/latest metadata, (2) a first artifact-acquisition seam that stages selected version ZIPs into `.testbed/.artifacts/`, inspects archive contents, and emits normalized source-material manifests for downstream future-repo conversion work, and (3) a hidden `.testbed` proving browser that exercises search/latest/detail/filtering/version-selection/download staging against that seam. QA originally found a real live-provider search failure; coder follow-up patched the search request shape to match the current provider contract (`order=<TitleCase enum>` instead of legacy `sortOrder=<lowercase>`), and the retry QA pass confirmed live search/latest/detail/download staging now all pass again. Independent audit confirmed the implemented repo slice is boundary-correct and review-ready. Conversion is now explicitly descoped from this repo into a future separate repo, and final plan closeout is being held only so Derrick can review the screenshot/UI and give feedback before formal closure.
+**What We Built:** A new `aerobeat-vendor-beatsaver` support package scaffold plus three implemented seams: (1) a read-only BeatSaver client for search/detail/latest metadata, (2) a first artifact-acquisition seam that stages selected version ZIPs into `.testbed/.artifacts/`, inspects archive contents, and emits normalized source-material manifests for downstream future-repo conversion work, and (3) a hidden `.testbed` proving browser that exercises search/latest/detail/filtering/version-selection/download staging against that seam. QA originally found a real live-provider search failure; coder follow-up patched the search request shape to match the current provider contract (`order=<TitleCase enum>` instead of legacy `sortOrder=<lowercase>`), and the retry QA pass confirmed live search/latest/detail/download staging now all pass again. Independent audit confirmed the implemented repo slice is boundary-correct. After Derrick's screenshot review surfaced one last UI defect, Task 8 fixed the result-card layout root cause by replacing the zero-min-width fixed-two-column grid with a bounded adaptive 1–2 column layout and explicit card minimum widths; the truthful live CTA verification was rerun afterward and again staged a real BeatSaver ZIP + manifest into `.testbed/.artifacts/qa_live/...`.
 
 **Reference Check:**
 - `REF-01` reviewed for concrete BeatSaver endpoint coverage and payload fields.

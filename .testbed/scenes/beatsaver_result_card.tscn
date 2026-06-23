@@ -4,7 +4,8 @@
 [ext_resource type="Script" path="res://scripts/beatsaver_remote_image.gd" id="2_remote"]
 
 [node name="BeatSaverResultCard" type="Button"]
-custom_minimum_size = Vector2(0, 248)
+custom_minimum_size = Vector2(280, 248)
+size_flags_horizontal = 3
 clip_contents = true
 focus_mode = 2
 toggle_mode = true

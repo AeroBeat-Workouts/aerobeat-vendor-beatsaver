@@ -115,6 +115,7 @@ text = "BeatSaver Catalog Results"
 
 [node name="ResultsScroll" type="ScrollContainer" parent="RootMargin/RootLayout/BodyLayout/ResultsPanel/ResultsMargin/ResultsVBox"]
 layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
 horizontal_scroll_mode = 0
 
