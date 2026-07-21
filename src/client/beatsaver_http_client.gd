@@ -113,7 +113,17 @@ func _execute_with_http_client(final_request: Dictionary, options: Dictionary) -
 		return {"transport_error": error_string(request_error), "code": request_error}
 	if not _wait_for_status(client, timeout_seconds, [HTTPClient.STATUS_BODY, HTTPClient.STATUS_CONNECTED]):
 		return {"transport_error": "Timed out waiting for BeatSaver response.", "code": ERR_TIMEOUT}
+	var progress_callback: Callable = options.get("progress_callback", Callable())
 	var body_chunks := PackedByteArray()
+	var content_length := -1
+	if client.has_method("get_response_body_length"):
+		content_length = int(client.get_response_body_length())
+	if progress_callback.is_valid():
+		progress_callback.call({
+			"bytesDownloaded": 0,
+			"contentLength": content_length,
+			"progress": 0.0,
+		})
 	while client.get_status() == HTTPClient.STATUS_BODY:
 		client.poll()
 		var chunk := client.read_response_body_chunk()
@@ -121,6 +131,15 @@ func _execute_with_http_client(final_request: Dictionary, options: Dictionary) -
 			OS.delay_msec(10)
 			continue
 		body_chunks.append_array(chunk)
+		if progress_callback.is_valid():
+			var progress := -1.0
+			if content_length > 0:
+				progress = minf(float(body_chunks.size()) / float(content_length), 1.0)
+			progress_callback.call({
+				"bytesDownloaded": body_chunks.size(),
+				"contentLength": content_length,
+				"progress": progress,
+			})
 	return {
 		"status_code": client.get_response_code(),
 		"headers": _response_headers_to_dictionary(client.get_response_headers()),

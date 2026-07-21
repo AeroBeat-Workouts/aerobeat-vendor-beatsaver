@@ -44,9 +44,24 @@ func stage_selected_version_artifact(map_detail: BeatSaverMapDetail, version_sel
 	var version_ref := _resolve_version_ref(map_detail, version_selector)
 	if version_ref == null:
 		return _error_result("Could not resolve the requested BeatSaver version for staging.")
+	var lifecycle_callback: Callable = options.get("lifecycle_callback", Callable())
+	if lifecycle_callback.is_valid():
+		lifecycle_callback.call({
+			"phase": "download",
+			"map_id": map_detail.map_id,
+			"version_hash": version_ref.hash,
+		})
 	var stage_result := _package_fetcher.fetch_version_package(map_detail, version_ref, staging_root, options)
 	if not stage_result.get("ok", false):
 		return stage_result
+	if lifecycle_callback.is_valid():
+		lifecycle_callback.call({
+			"phase": "staging",
+			"map_id": map_detail.map_id,
+			"version_hash": version_ref.hash,
+			"archive_path": str(stage_result.get("archive_path", "")),
+			"stage_directory_path": str(stage_result.get("stage_directory_path", "")),
+		})
 	var archive_report := _archive_inspector.inspect_archive(str(stage_result.get("archive_path", "")))
 	if not archive_report.get("ok", false):
 		return archive_report

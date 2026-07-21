@@ -25,6 +25,7 @@ const RESULTS_GRID_GAP := 12
 @onready var _detail_subtitle_label: Label = $RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/DetailSubtitleLabel
 @onready var _detail_metadata_label: RichTextLabel = $RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/DetailMetadataLabel
 @onready var _version_option_button: OptionButton = $RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/VersionRow/VersionOptionButton
+@onready var _preview_button: Button = $RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/PreviewButton
 @onready var _download_button: Button = $RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/DownloadButton
 
 var state: BeatSaverTestbedState
@@ -57,6 +58,7 @@ func _wire_ui() -> void:
 	_tag_filter_line_edit.text_changed.connect(_on_tag_filter_changed)
 	_refresh_button.pressed.connect(_on_refresh_pressed)
 	_version_option_button.item_selected.connect(_on_version_selected)
+	_preview_button.pressed.connect(_on_preview_pressed)
 	_download_button.pressed.connect(_on_download_pressed)
 
 func _on_mode_selected(index: int) -> void:
@@ -86,17 +88,22 @@ func _on_version_selected(index: int) -> void:
 	if index < 0:
 		return
 	state.selected_version_identifier = str(_version_option_button.get_item_metadata(index))
+	state._refresh_selected_package_truth()
 	_render_state()
 
+func _on_preview_pressed() -> void:
+	state.preview_selected_version()
+
 func _on_download_pressed() -> void:
-	state.stage_selected_version(state.selected_version_identifier)
+	await state.run_selected_version_action(self, state.selected_version_identifier)
 
 func _render_state() -> void:
 	_results_summary_label.text = _results_summary_text()
 	_status_label.text = state.current_status_text()
 	_query_line_edit.editable = not state.busy
 	_refresh_button.disabled = state.busy
-	_download_button.disabled = state.busy or state.selected_map == null
+	_download_button.disabled = state.action_button_disabled()
+	_preview_button.disabled = not bool(state.selected_preview_target().get("ok", false)) or state.selected_map == null
 	_update_results_grid_columns()
 	_rebuild_results_grid()
 	_render_detail_panel()
@@ -124,7 +131,8 @@ func _render_detail_panel() -> void:
 		_detail_metadata_label.text = ""
 		_detail_cover_image.set_image_url("")
 		_version_option_button.clear()
-		_download_button.text = "Stage Selected ZIP"
+		_preview_button.text = "Preview"
+		_download_button.text = "Download"
 		return
 	var detail: Dictionary = state.selected_detail_dictionary()
 	_detail_title_label.text = str(detail.get("detail_title", ""))
@@ -132,7 +140,8 @@ func _render_detail_panel() -> void:
 	_detail_cover_image.set_image_url(str(detail.get("cover_image_url", "")))
 	_detail_metadata_label.text = _build_detail_bbcode(detail)
 	_rebuild_versions(detail)
-	_download_button.text = "Stage Selected ZIP to .testbed/.artifacts"
+	_preview_button.text = state.preview_button_text()
+	_download_button.text = state.action_button_text()
 
 func _rebuild_versions(detail: Dictionary) -> void:
 	_version_option_button.clear()
@@ -147,6 +156,7 @@ func _rebuild_versions(detail: Dictionary) -> void:
 	if selected_index < 0 and options.size() > 0:
 		selected_index = 0
 		state.selected_version_identifier = str(options[0].get("id", ""))
+		state._refresh_selected_package_truth()
 	if selected_index >= 0:
 		_version_option_button.select(selected_index)
 

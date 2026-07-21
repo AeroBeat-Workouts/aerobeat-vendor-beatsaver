@@ -73,6 +73,52 @@ class FakeBeatSaverFacade:
 		stage_calls += 1
 		return _staging_facade.stage_selected_version_artifact(map_detail, version_selector, staging_root, options)
 
+class FakeContentAuthoringService:
+	extends RefCounted
+
+	var convert_calls: int = 0
+	var save_calls: int = 0
+	var _current_state: Dictionary = {}
+	var _last_package_token: String = "beatsaver-fixture"
+
+	func convert_beatsaver_stage_to_current_package(stage_dir: String, _options: Dictionary = {}) -> Dictionary:
+		convert_calls += 1
+		_last_package_token = stage_dir.get_file()
+		_current_state = {
+			"songs": [{
+				"songId": "ab-song-%s" % _last_package_token,
+				"audio": {
+					"filePath": "media/audio/%s.ogg" % _last_package_token,
+					"previewFilePath": "media/audio/%s-preview.ogg" % _last_package_token,
+					"previewUrl": "https://cdn.example.invalid/%s-preview.mp3" % _last_package_token,
+					"previewMode": "preview_file",
+				}
+			}]
+		}
+		return {"ok": true, "state": _current_state}
+
+	func save_current_package(destination_dir: String) -> Dictionary:
+		save_calls += 1
+		DirAccess.make_dir_recursive_absolute(destination_dir)
+		var output_dir := destination_dir.path_join("%s-package" % _last_package_token)
+		DirAccess.make_dir_recursive_absolute(output_dir.path_join("media/audio"))
+		var package_file := FileAccess.open(output_dir.path_join("song-package.yaml"), FileAccess.WRITE)
+		package_file.store_string("songPackageId: ab-songpkg-%s\n" % _last_package_token)
+		package_file.close()
+		var audio_file := FileAccess.open(output_dir.path_join("media/audio/%s.ogg" % _last_package_token), FileAccess.WRITE)
+		audio_file.store_string("fake song audio")
+		audio_file.close()
+		var preview_file := FileAccess.open(output_dir.path_join("media/audio/%s-preview.ogg" % _last_package_token), FileAccess.WRITE)
+		preview_file.store_string("fake preview audio")
+		preview_file.close()
+		var zip_file := FileAccess.open("%s.zip" % output_dir, FileAccess.WRITE)
+		zip_file.store_string("fake zip")
+		zip_file.close()
+		return {"ok": true, "outputDir": output_dir, "zipPath": "%s.zip" % output_dir}
+
+	func get_current_package_state() -> Dictionary:
+		return _current_state.duplicate(true)
+
 var _failure_count := 0
 
 func _init() -> void:
@@ -164,20 +210,20 @@ func _validate_facade() -> void:
 	var facade := BeatSaverVendorFacade.new(http_client)
 
 	var search_result := facade.search_maps(BeatSaverSearchQuery.new("fitbeat", 0, 2))
-	_assert(search_result.ok, "facade search should succeed")
-	_assert(search_result.data.maps.size() == 2, "facade search should return normalized maps")
+	_assert(bool(search_result.get("ok", false)), "facade search should succeed")
+	_assert(Array(Dictionary(search_result.get("data", {})).get("maps", [])).size() == 2, "facade search should return normalized maps")
 
 	var detail_result := facade.fetch_map_detail_by_id("1")
-	_assert(detail_result.ok, "facade detail-by-id should succeed")
-	_assert(detail_result.data.map_name == "succducc - me & u", "facade detail-by-id should return normalized detail")
+	_assert(bool(detail_result.get("ok", false)), "facade detail-by-id should succeed")
+	_assert(detail_result.get("data", null).map_name == "succducc - me & u", "facade detail-by-id should return normalized detail")
 
 	var hash_result := facade.fetch_map_detail_by_hash("fda568fc27c20d21f8dc6f3709b49b5cc96723be")
-	_assert(hash_result.ok, "facade detail-by-hash should succeed")
-	_assert(hash_result.data.primary_hash() == "fda568fc27c20d21f8dc6f3709b49b5cc96723be", "facade detail-by-hash should preserve hash")
+	_assert(bool(hash_result.get("ok", false)), "facade detail-by-hash should succeed")
+	_assert(hash_result.get("data", null).primary_hash() == "fda568fc27c20d21f8dc6f3709b49b5cc96723be", "facade detail-by-hash should preserve hash")
 
 	var latest_result := facade.list_latest_maps({"page_size": 2})
-	_assert(latest_result.ok, "facade latest listing should succeed")
-	_assert(latest_result.data.maps.size() == 2, "facade latest listing should return normalized maps")
+	_assert(bool(latest_result.get("ok", false)), "facade latest listing should succeed")
+	_assert(Array(Dictionary(latest_result.get("data", {})).get("maps", [])).size() == 2, "facade latest listing should return normalized maps")
 
 	_assert(request_log.size() == 4, "facade validation should execute four provider calls")
 
@@ -191,9 +237,10 @@ func _validate_acquisition(parser: BeatSaverResponseParser) -> void:
 	_assert(staged.get("ok", false), "acquisition seam should stage the selected version artifact")
 	if not staged.get("ok", false):
 		return
-	var stage: Dictionary = staged.data.stage
-	var archive: Dictionary = staged.data.archive
-	var manifest: Dictionary = staged.data.manifest
+	var staged_data: Dictionary = Dictionary(staged.get("data", {}))
+	var stage: Dictionary = Dictionary(staged_data.get("stage", {}))
+	var archive: Dictionary = Dictionary(staged_data.get("archive", {}))
+	var manifest: Dictionary = Dictionary(staged_data.get("manifest", {}))
 	_assert(FileAccess.file_exists(str(stage.get("archive_path", ""))), "staged archive should exist on disk")
 	_assert(int(archive.get("entry_count", 0)) == 5, "synthetic archive should expose five entries")
 	_assert(manifest.get("map_id", "") == "1", "manifest should preserve map id")
@@ -215,7 +262,12 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	var detail_payload := _read_json(FIXTURE_DETAIL_PATH)
 	var package_fetcher := _build_fixture_package_fetcher()
 	var fake_facade := FakeBeatSaverFacade.new(parser, search_payload, latest_payload, detail_payload, package_fetcher)
-	var state := BeatSaverTestbedState.new(fake_facade, VALIDATION_UI_ARTIFACT_ROOT)
+	var fake_authoring := FakeContentAuthoringService.new()
+	var shell_open_targets: Array = []
+	var shell_opener := func(target: String) -> int:
+		shell_open_targets.append(target)
+		return OK
+	var state := BeatSaverTestbedState.new(fake_facade, VALIDATION_UI_ARTIFACT_ROOT, fake_authoring, shell_opener)
 
 	var latest_result := state.load_latest()
 	_assert(latest_result.get("ok", false), "testbed state should load latest results")
@@ -238,15 +290,49 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	_assert(selection_result.get("ok", false), "select_map should fetch and store BeatSaver detail")
 	_assert(state.selected_map != null, "select_map should set a selected map")
 	_assert(fake_facade.detail_calls >= 1, "select_map should use the facade detail seam")
+	_assert(state.action_button_text() == "Download", "fresh selection should truthfully start at Download")
+	_assert(state.preview_button_text() == "Preview Remote", "fresh selection should expose remote preview truth")
+	_assert(String(state.selected_preview_target().get("kind", "")) == "remote_preview_url", "preview should start remote before conversion")
 
-	var stage_result := state.stage_selected_version()
-	_assert(stage_result.get("ok", false), "state staging should call stage_selected_version_artifact")
-	_assert(fake_facade.stage_calls == 1, "state staging should call the facade acquisition seam")
-	_assert(state.current_status_text().contains("manifest"), "state status should mention the staged manifest")
+	var workflow_result := await state.run_selected_version_action(root, state.selected_version_identifier)
+	_assert(workflow_result.get("ok", false), "state workflow should run download -> stage -> convert -> inspect")
+	_assert(fake_facade.stage_calls == 1, "state workflow should call the facade staging seam once")
+	_assert(fake_authoring.convert_calls == 1, "state workflow should delegate conversion to content authoring")
+	_assert(fake_authoring.save_calls == 1, "state workflow should save the converted package once")
+	_assert(state.action_button_text() == "Inspect", "completed workflow should switch CTA to Inspect")
+	_assert(not state.action_button_disabled(), "Inspect should re-enable the CTA")
+	_assert(state.preview_button_text() == "Preview Local", "completed workflow should prefer local preview truth")
+	_assert(String(state.selected_preview_target().get("kind", "")) == "local_preview", "completed workflow should prefer local preview files")
+	var package_dir := String(state._selected_package_record().get("package_dir", ""))
+	_assert(DirAccess.dir_exists_absolute(package_dir), "converted package directory should exist after workflow")
+	_assert(shell_open_targets.size() == 1 and shell_open_targets[0] == package_dir, "workflow should auto-open the converted package for inspection")
+
+	var preview_result := state.preview_selected_version()
+	_assert(preview_result.get("ok", false), "preview action should open the selected preview target")
+	_assert(shell_open_targets.size() == 2, "preview action should perform a second shell open")
+	_assert(String(preview_result.get("kind", "")) == "local_preview", "preview action should open the local preview file after conversion")
+
+	_cleanup_directory(package_dir)
+	state.select_map(first_map.map_id)
+	_assert(state.action_button_text() == "Download", "reselecting after deleting local package should fall back to Download")
+	_assert(String(state.selected_preview_target().get("kind", "")) == "remote_preview_url", "preview should fall back to remote when local package is gone")
+
+	var bridge_shell_open_targets: Array = []
+	var bridge_state := BeatSaverTestbedState.new(fake_facade, "%s/bridge" % VALIDATION_UI_ARTIFACT_ROOT, null, func(target: String) -> int:
+		bridge_shell_open_targets.append(target)
+		return OK
+	)
+	bridge_state.load_search("fitbeat")
+	bridge_state.select_map(first_map.map_id)
+	var bridge_workflow := await bridge_state.run_selected_version_action(root, bridge_state.selected_version_identifier)
+	_assert(bridge_workflow.get("ok", false), "default bridge should run the downstream conversion seam end-to-end")
+	var bridge_preview_kind := String(bridge_state.selected_preview_target().get("kind", ""))
+	_assert(bridge_preview_kind == "local_preview" or bridge_preview_kind == "local_source_audio", "default bridge should prefer local converted audio truth after conversion")
+	_assert(bridge_shell_open_targets.size() == 1, "default bridge should auto-open the converted package once")
 
 	var browser = BROWSER_SCENE.instantiate()
 	browser.auto_bootstrap = false
-	browser.state = BeatSaverTestbedState.new(fake_facade, VALIDATION_UI_ARTIFACT_ROOT)
+	browser.state = BeatSaverTestbedState.new(fake_facade, VALIDATION_UI_ARTIFACT_ROOT, fake_authoring, shell_opener)
 	root.add_child(browser)
 	await process_frame
 	browser.size = Vector2(980, 720)
@@ -267,16 +353,28 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 		await process_frame
 		var selected_card: Control = results_grid.get_child(0)
 		_assert(selected_card.size.x >= 260.0, "result cards should remain readable after the detail panel opens")
-		browser.get_node("RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/DownloadButton").emit_signal("pressed")
-		await process_frame
+		var preview_button: Button = browser.get_node("RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/PreviewButton")
+		var download_button: Button = browser.get_node("RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/DownloadButton")
+		_assert(preview_button.text == "Preview Remote", "detail panel should show remote preview before acquisition")
+		_assert(download_button.text == "Download", "detail panel should start with Download before acquisition")
+		download_button.emit_signal("pressed")
+		for _i in range(12):
+			await process_frame
+			if browser.state.action_button_text() == "Inspect":
+				break
 		_assert(browser.state.last_download_result.get("ok", false), "download CTA should stage the selected BeatSaver ZIP")
 		var manifest_path := str(browser.state.last_download_result.get("data", {}).get("manifest", {}).get("manifest_path", ""))
 		_assert(FileAccess.file_exists(manifest_path), "browser CTA should persist a manifest to the local artifacts folder")
+		_assert(download_button.text == "Inspect", "detail panel CTA should promote to Inspect after conversion")
+		_assert(preview_button.text == "Preview Local", "detail panel preview should prefer local media after conversion")
 	browser.queue_free()
 	await process_frame
 
 func _build_fixture_package_fetcher() -> BeatSaverPackageFetcher:
-	return BeatSaverPackageFetcher.new(null, func(_download_url: String, destination_path: String, _options: Dictionary) -> Dictionary:
+	return BeatSaverPackageFetcher.new(null, func(_download_url: String, destination_path: String, options: Dictionary) -> Dictionary:
+		var progress_callback: Callable = options.get("progress_callback", Callable())
+		if progress_callback.is_valid():
+			progress_callback.call({"bytesDownloaded": 0, "contentLength": 100, "progress": 0.0})
 		var bytes := FileAccess.get_file_as_bytes(FIXTURE_PACKAGE_PATH)
 		var file := FileAccess.open(destination_path, FileAccess.WRITE)
 		if file == null:
@@ -284,6 +382,8 @@ func _build_fixture_package_fetcher() -> BeatSaverPackageFetcher:
 		file.store_buffer(bytes)
 		file.flush()
 		file.close()
+		if progress_callback.is_valid():
+			progress_callback.call({"bytesDownloaded": bytes.size(), "contentLength": bytes.size(), "progress": 1.0})
 		return {"ok": true, "destination_path": destination_path, "bytes_written": bytes.size()}
 	)
 
