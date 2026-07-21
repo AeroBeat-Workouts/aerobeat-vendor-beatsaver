@@ -8,6 +8,7 @@ var map_name: String
 var version_hash: String
 var version_key: String
 var version_download_url: String
+var preview_url: String
 var stage_root_path: String
 var stage_directory_path: String
 var archive_path: String
@@ -31,6 +32,7 @@ func _init(payload: Dictionary = {}) -> void:
 	version_hash = str(payload.get("version_hash", ""))
 	version_key = str(payload.get("version_key", ""))
 	version_download_url = str(payload.get("version_download_url", ""))
+	preview_url = str(payload.get("preview_url", payload.get("previewUrl", payload.get("previewURL", ""))))
 	stage_root_path = str(payload.get("stage_root_path", ""))
 	stage_directory_path = str(payload.get("stage_directory_path", ""))
 	archive_path = str(payload.get("archive_path", ""))
@@ -56,6 +58,7 @@ func to_dictionary() -> Dictionary:
 		"version_hash": version_hash,
 		"version_key": version_key,
 		"version_download_url": version_download_url,
+		"preview_url": preview_url,
 		"stage_root_path": stage_root_path,
 		"stage_directory_path": stage_directory_path,
 		"archive_path": archive_path,

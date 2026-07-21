@@ -18,6 +18,7 @@ func build_manifest(map_detail: BeatSaverMapDetail, version_ref: BeatSaverVersio
 		"version_hash": version_ref.hash,
 		"version_key": version_ref.key,
 		"version_download_url": version_ref.download_url,
+		"preview_url": version_ref.preview_url,
 		"stage_root_path": str(stage_result.get("stage_root_path", "")),
 		"stage_directory_path": str(stage_result.get("stage_directory_path", "")),
 		"archive_path": str(stage_result.get("archive_path", "")),

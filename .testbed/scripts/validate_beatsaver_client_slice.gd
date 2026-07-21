@@ -329,6 +329,11 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	var bridge_preview_kind := String(bridge_state.selected_preview_target().get("kind", ""))
 	_assert(bridge_preview_kind == "local_preview" or bridge_preview_kind == "local_source_audio", "default bridge should prefer local converted audio truth after conversion")
 	_assert(bridge_shell_open_targets.size() == 1, "default bridge should auto-open the converted package once")
+	var bridge_package_dir := String(bridge_state._selected_package_record().get("package_dir", ""))
+	_cleanup_directory(bridge_package_dir)
+	bridge_state.select_map(first_map.map_id)
+	_assert(bridge_state.action_button_text() == "Download", "default bridge should fall back to Download after deleting the local package")
+	_assert(String(bridge_state.selected_preview_target().get("kind", "")) == "remote_preview_url", "default bridge should preserve remote preview truth after deleting the local package")
 
 	var browser = BROWSER_SCENE.instantiate()
 	browser.auto_bootstrap = false
