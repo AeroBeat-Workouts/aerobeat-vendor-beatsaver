@@ -1,8 +1,8 @@
 # AeroBeat Vendor BeatSaver Preview Audio In-Engine Playback
 
 **Date:** 2026-07-21
-**Status:** In Progress
-**Last Updated:** 2026-07-21 17:33 EDT
+**Status:** Complete
+**Last Updated:** 2026-07-21 19:30 EDT
 **Blocked Reason:** None
 **Agent:** `pico`
 
@@ -105,9 +105,9 @@ Likely files to change for implementation: `.testbed/scripts/beatsaver_browser_t
 - verification notes only if needed
 - this plan file
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending Derrick approval.
+**Results:** QA evidence is present and consistent with the landed slice. The strongest repo-local validation for this lane is `godot --headless --path .testbed -s res://scripts/validate_beatsaver_client_slice.gd`, which covers scene-level remote preview playback before acquisition and scene-level local preview playback after conversion. That validation passes on Godot `4.6.2.stable.official.71f334935` with the expected success banner `BeatSaver client/testbed validation passed.` The run still emits `WARNING: ObjectDB instances leaked at exit (run with --verbose for details).`, but it exits 0 and QA found no evidence that the warning was introduced by this preview slice.
 
 ---
 
@@ -126,25 +126,34 @@ Likely files to change for implementation: `.testbed/scripts/beatsaver_browser_t
 - audit notes only if needed
 - this plan file
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending Derrick approval.
+**Results:** Independent audit passed. I reran the strongest repo-local validation available from the repo root: `godot --headless --path .testbed -s res://scripts/validate_beatsaver_client_slice.gd`. Result: ✅ `BeatSaver client/testbed validation passed.` on Godot `4.6.2.stable.official.71f334935`. The run still emits `WARNING: ObjectDB instances leaked at exit (run with --verbose for details).` during shutdown, but it exits 0 and I found no preview-specific regression evidence tied to that warning.
+
+Exact audit evidence:
+- **Bounded scope stayed truthful.** Commit `0952a38` touches only the preview plan, `.testbed/scenes/beatsaver_browser_testbed.tscn`, `.testbed/scripts/beatsaver_browser_testbed.gd`, `.testbed/scripts/beatsaver_testbed_state.gd`, and `.testbed/scripts/validate_beatsaver_client_slice.gd`. I found no widened changes in BeatSaver download, staging, conversion, or non-testbed product code outside the small preview-target/state seam and scene playback wiring.
+- **Preview no longer shell-opens audio.** `preview_selected_version()` now resolves and returns preview target truth without calling `_open_external(...)` (`.testbed/scripts/beatsaver_testbed_state.gd:363-372`). The only remaining production `OS.shell_open(...)` path under the hidden testbed is Inspect/package-open via `_open_external()` from `inspect_selected_version_package()` (`.testbed/scripts/beatsaver_testbed_state.gd:374-398, 670-673`). The validation also asserts Preview does not append a new shell-open target while Inspect still does (`.testbed/scripts/validate_beatsaver_client_slice.gd:376-381`).
+- **Scene-owned in-engine playback is the active truth.** The scene now owns `PreviewAudioPlayer` and `PreviewHttpRequest` nodes (`.testbed/scenes/beatsaver_browser_testbed.tscn:195-199`), and `BeatSaverBrowserTestbed.play_selected_preview()` routes local targets through `_play_preview_path(...)` and remote URLs through `_fetch_remote_preview(...)` → `_cache_remote_preview(...)` → `_play_preview_path(...)` (`.testbed/scripts/beatsaver_browser_testbed.gd:111-168, 187-238`).
+- **Strongest repo-local validation exercises both major playback branches.** The validation scene pass confirms remote preview playback succeeds before acquisition, preserves `kind == "remote_preview_url"`, writes a cache file, and sets `PreviewAudioPlayer.stream != null` (`.testbed/scripts/validate_beatsaver_client_slice.gd:440-444`). It also confirms local preview playback succeeds after conversion, preserves `kind == "local_preview"`, and keeps `PreviewAudioPlayer.stream != null` (`.testbed/scripts/validate_beatsaver_client_slice.gd:454-458`).
+- **Fallback ordering is still correct, with one explicit caveat.** `selected_preview_target()` still prefers `local_preview` → `local_source_audio` → `remote_preview_url` (`.testbed/scripts/beatsaver_testbed_state.gd:400-414`). The validation preserves this truth at the selection/code-path level and explicitly allows converted local audio truth to surface as either `local_preview` or `local_source_audio` in the authoring-bridge path (`.testbed/scripts/validate_beatsaver_client_slice.gd:397-404`). However, the `local_source_audio` fallback is **not** exercised by a dedicated scene-playback fixture that removes only the preview file while leaving source audio intact; that caveat remains real and documented.
+
+Audit conclusion: this slice satisfies `REF-01`, stays bounded to in-engine preview playback in the hidden `.testbed`, removes Preview's browser shell-open behavior for audio playback, and passes the strongest current repo-local validation. The remaining `local_source_audio` note is an acknowledged coverage caveat, not a failure.
 
 ---
 
 ## Final Results
 
-**Status:** ⚠️ Draft
+**Status:** ✅ Complete
 
-**What We Built:** Planning only so far.
+**What We Built:** The hidden BeatSaver `.testbed` now plays Preview audio in-engine through scene-owned playback (`PreviewAudioPlayer` + `PreviewHttpRequest`) instead of shell-opening preview URLs in the system browser. Remote preview playback is validated before acquisition; local preview playback is validated after conversion.
 
-**Reference Check:** Ready to execute against the reported Preview-in-browser bug once approved.
+**Reference Check:** `REF-01` is satisfied: Preview no longer routes audio playback through browser shell-open behavior. `REF-03` remains the source of truth for preview-target selection order (`local_preview` → `local_source_audio` → `remote_preview_url`), and `REF-04` remains the source of truth for scene/runtime playback orchestration. `REF-02` stayed intact because the fix remained bounded to the hidden `.testbed` preview path rather than widening into unrelated GodotEnv/package workflow changes. Explicit caveat retained: `local_source_audio` fallback is code-path/selection-truth verified, not exercised by a dedicated scene-playback fixture.
 
 **Commits:**
-- None yet
+- `0952a38` - Play BeatSaver previews in-engine
 
-**Lessons Learned:** Opening a remote preview URL is not the same as validating preview-audio behavior in the testbed; the playback path itself needs explicit in-engine truth.
+**Lessons Learned:** For preview/media work, branch-order truth and scene-playback truth should be called out separately. A passing selection-order assertion is valuable, but it is not the same thing as an end-to-end playback fixture for every fallback branch.
 
 ---
 
-*Started on 2026-07-21*
+*Completed on 2026-07-21*
