@@ -1,13 +1,13 @@
 extends SceneTree
 
-const BeatSaverPackageFetcher = preload("res://../src/acquisition/beatsaver_package_fetcher.gd")
-const BeatSaverVendorFacade = preload("res://../src/facade/beatsaver_vendor_facade.gd")
+const BeatSaverPackageFetcher = preload("res://addons/aerobeat-vendor-beatsaver/src/acquisition/beatsaver_package_fetcher.gd")
+const BeatSaverVendorFacade = preload("res://addons/aerobeat-vendor-beatsaver/src/facade/beatsaver_vendor_facade.gd")
 const BeatSaverBrowserTestbed = preload("res://scripts/beatsaver_browser_testbed.gd")
 const BeatSaverTestbedState = preload("res://scripts/beatsaver_testbed_state.gd")
-const BeatSaverHttpClient = preload("res://../src/client/beatsaver_http_client.gd")
-const BeatSaverRequestBuilder = preload("res://../src/client/beatsaver_request_builder.gd")
-const BeatSaverResponseParser = preload("res://../src/client/beatsaver_response_parser.gd")
-const BeatSaverSearchQuery = preload("res://../src/models/beatsaver_search_query.gd")
+const BeatSaverHttpClient = preload("res://addons/aerobeat-vendor-beatsaver/src/client/beatsaver_http_client.gd")
+const BeatSaverRequestBuilder = preload("res://addons/aerobeat-vendor-beatsaver/src/client/beatsaver_request_builder.gd")
+const BeatSaverResponseParser = preload("res://addons/aerobeat-vendor-beatsaver/src/client/beatsaver_response_parser.gd")
+const BeatSaverSearchQuery = preload("res://addons/aerobeat-vendor-beatsaver/src/models/beatsaver_search_query.gd")
 
 const BROWSER_SCENE = preload("res://scenes/beatsaver_browser_testbed.tscn")
 const FIXTURE_DETAIL_PATH := "res://../assets/fixtures/beatsaver_api/map_detail_id_1.json"

@@ -1,15 +1,15 @@
 class_name BeatSaverVendorFacade
 extends RefCounted
 
-const BeatSaverArchiveInspector = preload("res://../src/acquisition/beatsaver_archive_inspector.gd")
-const BeatSaverPackageFetcher = preload("res://../src/acquisition/beatsaver_package_fetcher.gd")
-const BeatSaverStageManifestBuilder = preload("res://../src/acquisition/beatsaver_stage_manifest_builder.gd")
-const BeatSaverHttpClient = preload("res://../src/client/beatsaver_http_client.gd")
-const BeatSaverRequestBuilder = preload("res://../src/client/beatsaver_request_builder.gd")
-const BeatSaverResponseParser = preload("res://../src/client/beatsaver_response_parser.gd")
-const BeatSaverMapDetail = preload("res://../src/models/beatsaver_map_detail.gd")
-const BeatSaverSearchQuery = preload("res://../src/models/beatsaver_search_query.gd")
-const BeatSaverVersionRef = preload("res://../src/models/beatsaver_version_ref.gd")
+const BeatSaverArchiveInspector = preload("../acquisition/beatsaver_archive_inspector.gd")
+const BeatSaverPackageFetcher = preload("../acquisition/beatsaver_package_fetcher.gd")
+const BeatSaverStageManifestBuilder = preload("../acquisition/beatsaver_stage_manifest_builder.gd")
+const BeatSaverHttpClient = preload("../client/beatsaver_http_client.gd")
+const BeatSaverRequestBuilder = preload("../client/beatsaver_request_builder.gd")
+const BeatSaverResponseParser = preload("../client/beatsaver_response_parser.gd")
+const BeatSaverMapDetail = preload("../models/beatsaver_map_detail.gd")
+const BeatSaverSearchQuery = preload("../models/beatsaver_search_query.gd")
+const BeatSaverVersionRef = preload("../models/beatsaver_version_ref.gd")
 
 var _http_client: BeatSaverHttpClient
 var _request_builder: BeatSaverRequestBuilder

@@ -1,7 +1,7 @@
 class_name BeatSaverMapDetail
 extends RefCounted
 
-const BeatSaverVersionRef = preload("res://../src/models/beatsaver_version_ref.gd")
+const BeatSaverVersionRef = preload("./beatsaver_version_ref.gd")
 
 var provider: String = "beatsaver"
 var map_id: String

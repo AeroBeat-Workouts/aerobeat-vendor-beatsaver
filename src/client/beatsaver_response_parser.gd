@@ -1,7 +1,7 @@
 class_name BeatSaverResponseParser
 extends RefCounted
 
-const BeatSaverMapDetail = preload("res://../src/models/beatsaver_map_detail.gd")
+const BeatSaverMapDetail = preload("../models/beatsaver_map_detail.gd")
 
 func parse_map_detail(payload: Dictionary) -> BeatSaverMapDetail:
 	return BeatSaverMapDetail.new(payload)

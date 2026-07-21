@@ -1,7 +1,7 @@
 class_name BeatSaverRequestBuilder
 extends RefCounted
 
-const BeatSaverSearchQuery = preload("res://../src/models/beatsaver_search_query.gd")
+const BeatSaverSearchQuery = preload("../models/beatsaver_search_query.gd")
 const DEFAULT_BASE_URL := "https://api.beatsaver.com"
 const ALLOWED_LATEST_SORTS := ["FIRST_PUBLISHED", "UPDATED", "LAST_PUBLISHED", "CREATED", "CURATED"]
 

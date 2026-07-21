@@ -1,9 +1,9 @@
 class_name BeatSaverPackageFetcher
 extends RefCounted
 
-const BeatSaverHttpClient = preload("res://../src/client/beatsaver_http_client.gd")
-const BeatSaverMapDetail = preload("res://../src/models/beatsaver_map_detail.gd")
-const BeatSaverVersionRef = preload("res://../src/models/beatsaver_version_ref.gd")
+const BeatSaverHttpClient = preload("../client/beatsaver_http_client.gd")
+const BeatSaverMapDetail = preload("../models/beatsaver_map_detail.gd")
+const BeatSaverVersionRef = preload("../models/beatsaver_version_ref.gd")
 
 var _http_client: BeatSaverHttpClient
 var _downloader: Callable

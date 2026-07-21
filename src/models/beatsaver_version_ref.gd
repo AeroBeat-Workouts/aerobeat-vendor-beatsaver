@@ -1,7 +1,7 @@
 class_name BeatSaverVersionRef
 extends RefCounted
 
-const BeatSaverDifficultyRef = preload("res://../src/models/beatsaver_difficulty_ref.gd")
+const BeatSaverDifficultyRef = preload("./beatsaver_difficulty_ref.gd")
 
 var hash: String
 var key: String

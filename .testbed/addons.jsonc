@@ -6,6 +6,11 @@
       "source": "symlink",
       "subfolder": "/"
     },
+    "aerobeat-tool-content-authoring": {
+      "url": "../../aerobeat-tool-content-authoring",
+      "source": "symlink",
+      "subfolder": "/"
+    },
     "aerobeat-tool-headless-manager": {
       "url": "../../aerobeat-tool-headless-manager",
       "source": "symlink",

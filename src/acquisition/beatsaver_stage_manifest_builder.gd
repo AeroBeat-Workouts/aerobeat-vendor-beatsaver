@@ -1,9 +1,9 @@
 class_name BeatSaverStageManifestBuilder
 extends RefCounted
 
-const BeatSaverMapDetail = preload("res://../src/models/beatsaver_map_detail.gd")
-const BeatSaverSourcePackageManifest = preload("res://../src/models/beatsaver_source_package_manifest.gd")
-const BeatSaverVersionRef = preload("res://../src/models/beatsaver_version_ref.gd")
+const BeatSaverMapDetail = preload("../models/beatsaver_map_detail.gd")
+const BeatSaverSourcePackageManifest = preload("../models/beatsaver_source_package_manifest.gd")
+const BeatSaverVersionRef = preload("../models/beatsaver_version_ref.gd")
 
 func build_manifest(map_detail: BeatSaverMapDetail, version_ref: BeatSaverVersionRef, stage_result: Dictionary, archive_report: Dictionary) -> BeatSaverSourcePackageManifest:
 	var info_dat: Dictionary = archive_report.get("parsed_info_dat", {}) if archive_report.get("parsed_info_dat", {}) is Dictionary else {}

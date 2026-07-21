@@ -1,7 +1,7 @@
 class_name BeatSaverResultCard
 extends Button
 
-const BeatSaverMapDetail = preload("res://../src/models/beatsaver_map_detail.gd")
+const BeatSaverMapDetail = preload("res://addons/aerobeat-vendor-beatsaver/src/models/beatsaver_map_detail.gd")
 
 signal map_chosen(map_id: String)
 

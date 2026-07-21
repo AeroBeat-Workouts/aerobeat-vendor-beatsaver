@@ -1,7 +1,7 @@
 class_name BeatSaverBrowserTestbed
 extends Control
 
-const BeatSaverVendorFacade = preload("res://../src/facade/beatsaver_vendor_facade.gd")
+const BeatSaverVendorFacade = preload("res://addons/aerobeat-vendor-beatsaver/src/facade/beatsaver_vendor_facade.gd")
 const BeatSaverTestbedState = preload("res://scripts/beatsaver_testbed_state.gd")
 const RESULT_CARD_SCENE = preload("res://scenes/beatsaver_result_card.tscn")
 const RESULT_CARD_TARGET_WIDTH := 280

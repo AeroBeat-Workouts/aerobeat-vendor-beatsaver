@@ -1,14 +1,14 @@
 class_name BeatSaverTestbedState
 extends RefCounted
 
-const BeatSaverVendorFacade = preload("res://../src/facade/beatsaver_vendor_facade.gd")
-const BeatSaverSearchQuery = preload("res://../src/models/beatsaver_search_query.gd")
+const BeatSaverVendorFacade = preload("res://addons/aerobeat-vendor-beatsaver/src/facade/beatsaver_vendor_facade.gd")
+const BeatSaverSearchQuery = preload("res://addons/aerobeat-vendor-beatsaver/src/models/beatsaver_search_query.gd")
 
 class ContentAuthoringBridge:
 	extends RefCounted
 
-	const CONVERSION_SERVICE_PATH := "res://../../aerobeat-tool-content-authoring/src/services/importers/beatsaver_stage_conversion_service.gd"
-	const WORKFLOW_SERVICE_PATH := "res://../../aerobeat-tool-content-authoring/src/services/workflow/song_package_workflow_service.gd"
+	const CONVERSION_SERVICE_PATH := "res://addons/aerobeat-tool-content-authoring/src/services/importers/beatsaver_stage_conversion_service.gd"
+	const WORKFLOW_SERVICE_PATH := "res://addons/aerobeat-tool-content-authoring/src/services/workflow/song_package_workflow_service.gd"
 
 	var _conversion_service = null
 	var _workflow_service = null
