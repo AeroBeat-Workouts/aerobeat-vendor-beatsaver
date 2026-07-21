@@ -88,9 +88,9 @@ class FakeContentAuthoringService:
 			"songs": [{
 				"songId": "ab-song-%s" % _last_package_token,
 				"audio": {
-					"filePath": "media/audio/%s.ogg" % _last_package_token,
-					"previewFilePath": "media/audio/%s-preview.ogg" % _last_package_token,
-					"previewUrl": "https://cdn.example.invalid/%s-preview.mp3" % _last_package_token,
+					"filePath": "media/audio/%s.wav" % _last_package_token,
+					"previewFilePath": "media/audio/%s-preview.wav" % _last_package_token,
+					"previewUrl": "https://cdn.example.invalid/%s-preview.wav" % _last_package_token,
 					"previewMode": "preview_file",
 				}
 			}]
@@ -105,11 +105,11 @@ class FakeContentAuthoringService:
 		var package_file := FileAccess.open(output_dir.path_join("song-package.yaml"), FileAccess.WRITE)
 		package_file.store_string("songPackageId: ab-songpkg-%s\n" % _last_package_token)
 		package_file.close()
-		var audio_file := FileAccess.open(output_dir.path_join("media/audio/%s.ogg" % _last_package_token), FileAccess.WRITE)
-		audio_file.store_string("fake song audio")
+		var audio_file := FileAccess.open(output_dir.path_join("media/audio/%s.wav" % _last_package_token), FileAccess.WRITE)
+		audio_file.store_buffer(_build_silent_wav_bytes())
 		audio_file.close()
-		var preview_file := FileAccess.open(output_dir.path_join("media/audio/%s-preview.ogg" % _last_package_token), FileAccess.WRITE)
-		preview_file.store_string("fake preview audio")
+		var preview_file := FileAccess.open(output_dir.path_join("media/audio/%s-preview.wav" % _last_package_token), FileAccess.WRITE)
+		preview_file.store_buffer(_build_silent_wav_bytes())
 		preview_file.close()
 		var zip_file := FileAccess.open("%s.zip" % output_dir, FileAccess.WRITE)
 		zip_file.store_string("fake zip")
@@ -118,6 +118,40 @@ class FakeContentAuthoringService:
 
 	func get_current_package_state() -> Dictionary:
 		return _current_state.duplicate(true)
+
+	func _build_silent_wav_bytes(sample_rate: int = 22050, frames: int = 2205) -> PackedByteArray:
+		var data_size := frames * 2
+		var riff_size := 36 + data_size
+		var bytes := PackedByteArray()
+		bytes.resize(44 + data_size)
+		bytes.encode_u8(0, 0x52)
+		bytes.encode_u8(1, 0x49)
+		bytes.encode_u8(2, 0x46)
+		bytes.encode_u8(3, 0x46)
+		bytes.encode_u32(4, riff_size)
+		bytes.encode_u8(8, 0x57)
+		bytes.encode_u8(9, 0x41)
+		bytes.encode_u8(10, 0x56)
+		bytes.encode_u8(11, 0x45)
+		bytes.encode_u8(12, 0x66)
+		bytes.encode_u8(13, 0x6d)
+		bytes.encode_u8(14, 0x74)
+		bytes.encode_u8(15, 0x20)
+		bytes.encode_u32(16, 16)
+		bytes.encode_u16(20, 1)
+		bytes.encode_u16(22, 1)
+		bytes.encode_u32(24, sample_rate)
+		bytes.encode_u32(28, sample_rate * 2)
+		bytes.encode_u16(32, 2)
+		bytes.encode_u16(34, 16)
+		bytes.encode_u8(36, 0x64)
+		bytes.encode_u8(37, 0x61)
+		bytes.encode_u8(38, 0x74)
+		bytes.encode_u8(39, 0x61)
+		bytes.encode_u32(40, data_size)
+		for index in range(data_size):
+			bytes[44 + index] = 0
+		return bytes
 
 var _failure_count := 0
 
@@ -138,6 +172,40 @@ func _run_validation() -> void:
 		return
 	print("BeatSaver client/testbed validation passed.")
 	quit(0)
+
+func _build_silent_wav_bytes(sample_rate: int = 22050, frames: int = 2205) -> PackedByteArray:
+	var data_size := frames * 2
+	var riff_size := 36 + data_size
+	var bytes := PackedByteArray()
+	bytes.resize(44 + data_size)
+	bytes.encode_u8(0, 0x52)
+	bytes.encode_u8(1, 0x49)
+	bytes.encode_u8(2, 0x46)
+	bytes.encode_u8(3, 0x46)
+	bytes.encode_u32(4, riff_size)
+	bytes.encode_u8(8, 0x57)
+	bytes.encode_u8(9, 0x41)
+	bytes.encode_u8(10, 0x56)
+	bytes.encode_u8(11, 0x45)
+	bytes.encode_u8(12, 0x66)
+	bytes.encode_u8(13, 0x6d)
+	bytes.encode_u8(14, 0x74)
+	bytes.encode_u8(15, 0x20)
+	bytes.encode_u32(16, 16)
+	bytes.encode_u16(20, 1)
+	bytes.encode_u16(22, 1)
+	bytes.encode_u32(24, sample_rate)
+	bytes.encode_u32(28, sample_rate * 2)
+	bytes.encode_u16(32, 2)
+	bytes.encode_u16(34, 16)
+	bytes.encode_u8(36, 0x64)
+	bytes.encode_u8(37, 0x61)
+	bytes.encode_u8(38, 0x74)
+	bytes.encode_u8(39, 0x61)
+	bytes.encode_u32(40, data_size)
+	for index in range(data_size):
+		bytes[44 + index] = 0
+	return bytes
 
 func _validate_request_builder(builder: BeatSaverRequestBuilder) -> void:
 	var search_query := BeatSaverSearchQuery.new("fitbeat", 2, 10, "latest", false)
@@ -308,9 +376,9 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	_assert(shell_open_targets.size() == 1 and shell_open_targets[0] == package_dir, "workflow should auto-open the converted package for inspection")
 
 	var preview_result := state.preview_selected_version()
-	_assert(preview_result.get("ok", false), "preview action should open the selected preview target")
-	_assert(shell_open_targets.size() == 2, "preview action should perform a second shell open")
-	_assert(String(preview_result.get("kind", "")) == "local_preview", "preview action should open the local preview file after conversion")
+	_assert(preview_result.get("ok", false), "preview selection should resolve the selected preview target")
+	_assert(shell_open_targets.size() == 1, "preview selection should not shell-open audio playback targets")
+	_assert(String(preview_result.get("kind", "")) == "local_preview", "preview selection should preserve local preview truth after conversion")
 
 	_cleanup_directory(package_dir)
 	state.select_map(first_map.map_id)
@@ -335,9 +403,15 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	_assert(bridge_state.action_button_text() == "Download", "default bridge should fall back to Download after deleting the local package")
 	_assert(String(bridge_state.selected_preview_target().get("kind", "")) == "remote_preview_url", "default bridge should preserve remote preview truth after deleting the local package")
 
-	var browser = BROWSER_SCENE.instantiate()
+	var browser: BeatSaverBrowserTestbed = BROWSER_SCENE.instantiate()
 	browser.auto_bootstrap = false
 	browser.state = BeatSaverTestbedState.new(fake_facade, VALIDATION_UI_ARTIFACT_ROOT, fake_authoring, shell_opener)
+	browser.preview_remote_fetcher = func(_url: String) -> Dictionary:
+		return {
+			"ok": true,
+			"headers": PackedStringArray(["content-type: audio/wav"]),
+			"body": _build_silent_wav_bytes(),
+		}
 	root.add_child(browser)
 	await process_frame
 	browser.size = Vector2(980, 720)
@@ -360,8 +434,14 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 		_assert(selected_card.size.x >= 260.0, "result cards should remain readable after the detail panel opens")
 		var preview_button: Button = browser.get_node("RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/PreviewButton")
 		var download_button: Button = browser.get_node("RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/DownloadButton")
+		var preview_player: AudioStreamPlayer = browser.get_node("PreviewAudioPlayer")
 		_assert(preview_button.text == "Preview Remote", "detail panel should show remote preview before acquisition")
 		_assert(download_button.text == "Download", "detail panel should start with Download before acquisition")
+		var remote_preview_result := await browser.play_selected_preview()
+		_assert(remote_preview_result.get("ok", false), "browser preview should fetch and play remote audio in-engine before acquisition")
+		_assert(String(remote_preview_result.get("kind", "")) == "remote_preview_url", "browser preview should preserve remote preview truth before acquisition")
+		_assert(FileAccess.file_exists(browser.last_preview_cache_path), "browser preview should cache remote preview audio under user://")
+		_assert(preview_player.stream != null, "browser preview should load an audio stream for remote playback")
 		download_button.emit_signal("pressed")
 		for _i in range(12):
 			await process_frame
@@ -372,6 +452,10 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 		_assert(FileAccess.file_exists(manifest_path), "browser CTA should persist a manifest to the local artifacts folder")
 		_assert(download_button.text == "Inspect", "detail panel CTA should promote to Inspect after conversion")
 		_assert(preview_button.text == "Preview Local", "detail panel preview should prefer local media after conversion")
+		var local_preview_result := await browser.play_selected_preview()
+		_assert(local_preview_result.get("ok", false), "browser preview should play local converted audio in-engine after conversion")
+		_assert(String(local_preview_result.get("kind", "")) == "local_preview", "browser preview should prefer the local preview file after conversion")
+		_assert(preview_player.stream != null, "browser preview should keep a playable local stream after conversion")
 	browser.queue_free()
 	await process_frame
 

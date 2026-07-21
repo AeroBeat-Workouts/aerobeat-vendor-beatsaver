@@ -191,3 +191,9 @@ text = "Preview"
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 text = "Download"
+
+[node name="PreviewAudioPlayer" type="AudioStreamPlayer" parent="."]
+bus = &"Master"
+
+[node name="PreviewHttpRequest" type="HTTPRequest" parent="."]
+timeout = 10.0

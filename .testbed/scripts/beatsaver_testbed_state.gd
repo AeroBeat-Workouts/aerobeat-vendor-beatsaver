@@ -362,24 +362,13 @@ func run_selected_version_action(ui_host: Node, version_identifier: String = "")
 
 func preview_selected_version() -> Dictionary:
 	var preview_target: Dictionary = selected_preview_target()
+	last_preview_result = preview_target.duplicate(true)
 	if not bool(preview_target.get("ok", false)):
-		last_preview_result = preview_target
 		error_message = str(preview_target.get("error", {}).get("message", "No preview target is available."))
 		emit_signal("state_changed")
-		return preview_target
-	var target := String(preview_target.get("target", "")).strip_edges()
-	var open_result := _open_external(target)
-	last_preview_result = {
-		"ok": open_result == OK,
-		"target": target,
-		"kind": String(preview_target.get("kind", "")),
-		"error": {} if open_result == OK else {"message": "Failed to open preview target.", "code": open_result}
-	}
-	if open_result != OK:
-		error_message = str(last_preview_result.get("error", {}).get("message", "Failed to open preview target."))
-	else:
-		error_message = ""
-		emit_signal("state_changed")
+		return last_preview_result
+	error_message = ""
+	emit_signal("state_changed")
 	return last_preview_result
 
 func inspect_selected_version_package() -> Dictionary:

@@ -7,6 +7,9 @@ const RESULT_CARD_SCENE = preload("res://scenes/beatsaver_result_card.tscn")
 const RESULT_CARD_TARGET_WIDTH := 280
 const RESULT_CARD_MAX_COLUMNS := 2
 const RESULTS_GRID_GAP := 12
+const PREVIEW_CACHE_ROOT := "user://beatsaver-preview-cache"
+
+signal preview_request_finished(result: Dictionary)
 
 @export var auto_bootstrap := true
 
@@ -27,8 +30,14 @@ const RESULTS_GRID_GAP := 12
 @onready var _version_option_button: OptionButton = $RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/VersionRow/VersionOptionButton
 @onready var _preview_button: Button = $RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/PreviewButton
 @onready var _download_button: Button = $RootMargin/RootLayout/BodyLayout/DetailPanel/DetailMargin/DetailVBox/DownloadButton
+@onready var _preview_audio_player: AudioStreamPlayer = $PreviewAudioPlayer
+@onready var _preview_http_request: HTTPRequest = $PreviewHttpRequest
 
 var state: BeatSaverTestbedState
+var preview_stream_loader: Callable = Callable()
+var preview_remote_fetcher: Callable = Callable()
+var last_preview_cache_path: String = ""
+var _pending_preview_url: String = ""
 
 func _ready() -> void:
 	_setup_mode_picker()
@@ -37,6 +46,8 @@ func _ready() -> void:
 		state = BeatSaverTestbedState.new(BeatSaverVendorFacade.new(), "res://.artifacts")
 	state.state_changed.connect(_render_state)
 	_results_scroll.resized.connect(_on_results_scroll_resized)
+	if not _preview_http_request.request_completed.is_connected(_on_preview_request_completed):
+		_preview_http_request.request_completed.connect(_on_preview_request_completed)
 	_query_line_edit.text = state.remote_query_text
 	_filter_line_edit.text = state.local_filter_text
 	_tag_filter_line_edit.text = state.tag_filter_text
@@ -92,10 +103,153 @@ func _on_version_selected(index: int) -> void:
 	_render_state()
 
 func _on_preview_pressed() -> void:
-	state.preview_selected_version()
+	await play_selected_preview()
 
 func _on_download_pressed() -> void:
 	await state.run_selected_version_action(self, state.selected_version_identifier)
+
+func play_selected_preview() -> Dictionary:
+	var preview_target: Dictionary = state.preview_selected_version()
+	if not bool(preview_target.get("ok", false)):
+		_render_state()
+		return preview_target
+	var target := String(preview_target.get("target", "")).strip_edges()
+	var kind := String(preview_target.get("kind", "")).strip_edges()
+	if kind.begins_with("local_"):
+		return _play_preview_path(target, kind)
+	return await _play_remote_preview(target, kind)
+
+func _play_remote_preview(url: String, kind: String) -> Dictionary:
+	var fetch_result: Dictionary = await _fetch_remote_preview(url)
+	if not bool(fetch_result.get("ok", false)):
+		return _set_preview_failure(kind, url, str(fetch_result.get("error", {}).get("message", "Failed to fetch remote preview audio.")), int(fetch_result.get("error", {}).get("code", ERR_CANT_CONNECT)))
+	var cache_result := _cache_remote_preview(url, PackedStringArray(fetch_result.get("headers", PackedStringArray())), PackedByteArray(fetch_result.get("body", PackedByteArray())))
+	if not bool(cache_result.get("ok", false)):
+		return _set_preview_failure(kind, url, str(cache_result.get("error", {}).get("message", "Failed to cache remote preview audio.")), int(cache_result.get("error", {}).get("code", ERR_CANT_CREATE)))
+	last_preview_cache_path = str(cache_result.get("cache_path", ""))
+	var playback_result := _play_preview_path(last_preview_cache_path, kind)
+	if bool(playback_result.get("ok", false)):
+		playback_result["cache_path"] = last_preview_cache_path
+		state.last_preview_result = playback_result.duplicate(true)
+		state.emit_signal("state_changed")
+	return playback_result
+
+func _play_preview_path(path: String, kind: String) -> Dictionary:
+	var normalized_path := _normalize_path(path)
+	var stream := _load_audio_stream(normalized_path)
+	if stream == null:
+		return _set_preview_failure(kind, normalized_path, "Failed to decode preview audio for in-engine playback.", ERR_FILE_UNRECOGNIZED)
+	_preview_audio_player.stop()
+	_preview_audio_player.stream = stream
+	_preview_audio_player.play()
+	var result := {
+		"ok": true,
+		"kind": kind,
+		"target": normalized_path,
+		"error": {}
+	}
+	state.last_preview_result = result.duplicate(true)
+	state.error_message = ""
+	state.emit_signal("state_changed")
+	return result
+
+func _fetch_remote_preview(url: String) -> Dictionary:
+	if preview_remote_fetcher.is_valid():
+		var override_result = preview_remote_fetcher.call(url)
+		return Dictionary(override_result).duplicate(true)
+	if DisplayServer.get_name().to_lower() == "headless":
+		return {"ok": false, "error": {"message": "Remote preview fetch is unavailable in headless mode.", "code": ERR_UNAVAILABLE}}
+	if _preview_http_request.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
+		_preview_http_request.cancel_request()
+	_pending_preview_url = url
+	var request_error := _preview_http_request.request(url)
+	if request_error != OK:
+		return {"ok": false, "error": {"message": "Failed to request remote preview audio.", "code": request_error}}
+	return await preview_request_finished
+
+func _on_preview_request_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+	var payload := {
+		"ok": result == HTTPRequest.RESULT_SUCCESS and response_code >= 200 and response_code < 300 and not body.is_empty(),
+		"url": _pending_preview_url,
+		"response_code": response_code,
+		"headers": headers,
+		"body": body,
+		"error": {}
+	}
+	if not bool(payload.get("ok", false)):
+		payload["error"] = {
+			"message": "Remote preview request failed.",
+			"code": result if result != HTTPRequest.RESULT_SUCCESS else response_code,
+		}
+	_pending_preview_url = ""
+	emit_signal("preview_request_finished", payload)
+
+func _cache_remote_preview(url: String, headers: PackedStringArray, body: PackedByteArray) -> Dictionary:
+	if body.is_empty():
+		return {"ok": false, "error": {"message": "Remote preview audio response was empty.", "code": ERR_INVALID_DATA}}
+	var extension := _preview_extension(url, headers)
+	var cache_dir := ProjectSettings.globalize_path(PREVIEW_CACHE_ROOT)
+	DirAccess.make_dir_recursive_absolute(cache_dir)
+	var cache_path := cache_dir.path_join("%s.%s" % [url.sha256_text(), extension])
+	var file := FileAccess.open(cache_path, FileAccess.WRITE)
+	if file == null:
+		return {"ok": false, "error": {"message": "Failed to write cached remote preview audio.", "code": ERR_CANT_CREATE}}
+	file.store_buffer(body)
+	file.flush()
+	file.close()
+	return {"ok": true, "cache_path": cache_path}
+
+func _preview_extension(url: String, headers: PackedStringArray) -> String:
+	var content_type := _extract_header(headers, "content-type").to_lower()
+	if content_type.contains("ogg"):
+		return "ogg"
+	if content_type.contains("mpeg") or content_type.contains("mp3"):
+		return "mp3"
+	if content_type.contains("wav") or content_type.contains("wave"):
+		return "wav"
+	var lower_url := url.to_lower()
+	for extension in ["ogg", "mp3", "wav"]:
+		if lower_url.ends_with(".%s" % extension):
+			return extension
+	return "mp3"
+
+func _extract_header(headers: PackedStringArray, name: String) -> String:
+	var prefix := "%s:" % name.to_lower()
+	for line in headers:
+		if line.to_lower().begins_with(prefix):
+			return line.substr(line.find(":") + 1).strip_edges()
+	return ""
+
+func _load_audio_stream(path: String) -> AudioStream:
+	if preview_stream_loader.is_valid():
+		return preview_stream_loader.call(path)
+	var lower_path := path.to_lower()
+	if lower_path.ends_with(".ogg"):
+		return AudioStreamOggVorbis.load_from_file(path)
+	if lower_path.ends_with(".mp3"):
+		return AudioStreamMP3.load_from_file(path)
+	if lower_path.ends_with(".wav"):
+		return AudioStreamWAV.load_from_file(path)
+	var resource = ResourceLoader.load(path, "AudioStream")
+	return resource if resource is AudioStream else null
+
+func _normalize_path(path: String) -> String:
+	if path.begins_with("res://") or path.begins_with("user://"):
+		return ProjectSettings.globalize_path(path)
+	return path
+
+func _set_preview_failure(kind: String, target: String, message: String, code: int) -> Dictionary:
+	_preview_audio_player.stop()
+	var result := {
+		"ok": false,
+		"kind": kind,
+		"target": target,
+		"error": {"message": message, "code": code}
+	}
+	state.last_preview_result = result.duplicate(true)
+	state.error_message = message
+	state.emit_signal("state_changed")
+	return result
 
 func _render_state() -> void:
 	_results_summary_label.text = _results_summary_text()
