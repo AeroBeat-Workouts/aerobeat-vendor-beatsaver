@@ -1,8 +1,8 @@
 # AeroBeat Vendor BeatSaver Testbed Warning Cleanup
 
 **Date:** 2026-07-21
-**Status:** In Progress
-**Last Updated:** 2026-07-21 20:17 EDT
+**Status:** Complete
+**Last Updated:** 2026-07-22 09:44 EDT
 **Blocked Reason:** None
 **Agent:** `pico`
 
@@ -167,9 +167,25 @@ Implementation commit for this coder slice: `b4b089c` (`Fix BeatSaver warning lo
 **Files Created/Deleted/Modified:**
 - `.plans/2026-07-21-testbed-warning-cleanup.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Independent QA pass against the hidden `.testbed` scene/runtime truth. Exact commands run:
+- `bd update aerobeat-vendor-beatsaver-t53 --status in_progress --json`
+- `rg -n "const BeatSaverVendorFacade = preload\(|const BeatSaverSearchQuery = preload\(|const BeatSaverMapDetail = preload\(|const BeatSaverTestbedState = preload\(|func _extract_header\(headers: PackedStringArray, name: String\)|func _build_record_state\(version_identifier: String, action: String, progress_percent: int, seed: Dictionary\)|func _rebuild_versions\(detail: Dictionary\)|int\(\(x / 24\) \+ \(y / 24\)\)" .testbed/scripts/beatsaver_browser_testbed.gd .testbed/scripts/beatsaver_remote_image.gd .testbed/scripts/beatsaver_result_card.gd .testbed/scripts/beatsaver_testbed_state.gd`
+- `rg -n "header_name|seed_record|_rebuild_versions\(_detail\)|_rendered_result_ids|_failed_request_urls|_failed_decode_urls|set_image_url\(url: String\)" .testbed/scripts/beatsaver_browser_testbed.gd .testbed/scripts/beatsaver_remote_image.gd .testbed/scripts/beatsaver_testbed_state.gd`
+- `godot --headless --path .testbed --quit-after 3`
+- `godot --path .testbed --quit-after 3`
+- `godot --headless --path .testbed --script res://scripts/validate_beatsaver_client_slice.gd`
+- `godot --path .testbed --script /tmp/qa_warning_cleanup_check.gd`
+
+Findings:
+- The Task 1 startup/editor warning signatures are gone from the target runtime scripts. The targeted `rg` absence check returned no matches for the duplicate preload/class-name shadows, old `name`/`seed`/`detail` warning signatures, or the old integer-division expression. The follow-up shape check confirms the intended replacements are present: `header_name`, `seed_record`, `_rebuild_versions(_detail)`, `_rendered_result_ids`, and the remote-image failed/in-flight dedupe state.
+- `godot --headless --path .testbed --quit-after 3` and `godot --path .testbed --quit-after 3` both opened cleanly without reproducing the prior startup warning block.
+- Repo-local validation remains green: the built-in headless harness `res://scripts/validate_beatsaver_client_slice.gd` passed end-to-end. It did emit one shutdown-time `ObjectDB instances leaked at exit` warning after success, but that is not the BeatSaver warning-cleanup regression under test and did not fail the harness.
+- The focused GUI QA harness `/tmp/qa_warning_cleanup_check.gd` passed. It instantiates the actual browser scene with fixture-backed map data, emits repeated non-result `state_changed` churn, and proves the result-card node IDs and nested cover-image node IDs remain stable instead of being torn down/recreated. It also directly exercises the `BeatSaverRemoteImage.set_image_url(...)` short-circuit logic for unchanged in-flight and unchanged failed URLs, proving those repeated calls now no-op instead of re-entering the reset/request path.
+- Truth boundary: I did not reproduce Derrick’s exact live BeatSaver resolver/network failure (`Out of resolver queries` / `Can't connect`) against the remote service during QA. So I cannot claim the external network condition itself disappeared. What I *did* verify is the local multiplier path is neutralized truthfully: unrelated `state_changed` churn no longer rebuilds cards, and the remote-image node now short-circuits repeated unchanged URLs in the relevant in-flight/failed states. That is the behavior needed to stop the infinite local warning loop rather than merely hiding logs.
+
+QA verdict: **PASS**. The warning-cleanup slice is QA-ready for the auditor lane.
 
 ---
 
@@ -187,25 +203,42 @@ Implementation commit for this coder slice: `b4b089c` (`Fix BeatSaver warning lo
 **Files Created/Deleted/Modified:**
 - `.plans/2026-07-21-testbed-warning-cleanup.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Independent auditor pass. I verified the final state against Derrick’s warning report (`REF-01`), the prior repro map from Task 1, and the actual hidden testbed/runtime sources (`REF-03` through `REF-08`). Audit evidence run in this lane:
+- `git status --short`, `git log --oneline --decorate -n 6`, `git branch -vv`, `git rev-list --left-right --count HEAD...@{u}`
+- `git show --stat --oneline 53e4800` and `git show --stat --oneline b4b089c`
+- targeted source-truth `rg` across `.testbed` / `src` to confirm the old startup-warning signatures are gone from the runtime scripts and the new behavioral state (`_rendered_result_ids`, `_failed_request_urls`, `_failed_decode_urls`, `header_name`, `seed_record`) is actually present
+- `godot --headless --path .testbed --quit-after 3`
+- `godot --path .testbed --quit-after 3`
+- `godot --headless --path .testbed --script res://scripts/validate_beatsaver_client_slice.gd`
+- `godot --headless --path .testbed --script /tmp/audit_beatsaver_warning_cleanup.gd`
+
+Truth findings:
+- Startup/editor warning cleanup is real, not suppressed. The prior duplicate class-shadowing preload constants and parser-warning signatures identified in Task 1 are removed from the affected `.testbed` scripts, and both headless and GUI startup open cleanly without recreating Derrick’s startup warning block.
+- The runtime warning-loop cleanup is also real, not papered over. `BeatSaverRemoteImage` still calls `push_warning(...)`; it was not muted. Instead, it now memoizes failed request/decode URLs and short-circuits repeated unchanged URLs. `BeatSaverBrowserTestbed` now preserves result-card/cover-image node identity across unrelated `state_changed` churn by comparing `_rendered_result_ids` before rebuilding. The dedicated audit harness proved repeated non-result state changes no longer recreate the cards or nested cover-image nodes.
+- Commit/push truth is clean: `53e4800` and `b4b089c` are present in `main`, `origin/main` matches `HEAD` (`0 0` ahead/behind), and the only working-tree modification during audit was this plan update.
+- Remaining caveat, stated precisely: I did **not** reproduce Derrick’s exact live upstream resolver/network failure (`Out of resolver queries` / `Can't connect`) against BeatSaver during audit. So I cannot claim the upstream network condition vanished. I can truthfully claim the local spam loop is fixed, because the rerender multiplier path identified in Task 1 is gone and identical failed URLs are now deduped rather than warning on every repeated render.
+
+Audit verdict: **PASS**. The slice is truthful and closure-ready, so this auditor lane may close bead `aerobeat-vendor-beatsaver-qgz`.
 
 ---
 
 ## Final Results
 
-**Status:** ⚠️ In Progress
+**Status:** ✅ Complete
 
-**What We Built:** Pending.
+**What We Built:** The hidden BeatSaver testbed now opens without the reproduced startup/editor warning block, and the download-time cover-image failure path no longer turns unrelated `state_changed` churn into an infinite local warning loop. The final fix is behavioral: startup parser/name warnings were removed at their source, result-card rerenders are gated by visible-result identity, and repeated failed image URLs are deduped once per URL instead of re-warning forever.
 
-**Reference Check:** Pending.
+**Reference Check:** `REF-01` satisfied for the reproduced warning families and spam-loop diagnosis; `REF-02` preserved the prior hidden-testbed architecture context; `REF-03` through `REF-08` match the final audited source/runtime truth. Deliberate caveat: the exact external BeatSaver resolver/network failure from Derrick’s screenshot was not reproduced live in this audit lane, so the claim is limited to truthful local loop elimination rather than asserting the upstream network condition itself is gone.
 
 **Commits:**
-- Pending.
+- `53e4800` - Fix BeatSaver testbed startup warnings
+- `b4b089c` - Fix BeatSaver warning loop rerenders
+- `1af336b` - Update BeatSaver warning cleanup plan
 
-**Lessons Learned:** Pending.
+**Lessons Learned:** For warning cleanup, source-truth matters more than log silence. The durable fix came from removing the parser-warning causes and stopping unnecessary UI rebuilds, while preserving a once-per-URL warning path so real remote failures still surface truthfully.
 
 ---
 
-*Started on 2026-07-21*
+*Completed on 2026-07-22*
