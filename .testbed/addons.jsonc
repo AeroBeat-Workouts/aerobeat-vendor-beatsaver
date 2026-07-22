@@ -11,6 +11,11 @@
       "source": "symlink",
       "subfolder": "/"
     },
+    "aerobeat-content-core": {
+      "url": "../../aerobeat-content-core",
+      "source": "symlink",
+      "subfolder": "/"
+    },
     "aerobeat-tool-headless-manager": {
       "url": "../../aerobeat-tool-headless-manager",
       "source": "symlink",
