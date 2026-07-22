@@ -403,13 +403,18 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	bridge_state.load_search("fitbeat")
 	bridge_state.select_map(first_map.map_id)
 	var bridge_workflow := await bridge_state.run_selected_version_action(root, bridge_state.selected_version_identifier)
-	_assert(bridge_workflow.get("ok", false), "default bridge should run the downstream conversion seam end-to-end")
+	_assert(not bridge_workflow.get("ok", true), "default bridge should not report success when delegated package validation is unavailable")
 	var bridge_preview_kind := String(bridge_state.selected_preview_target().get("kind", ""))
 	_assert(bridge_preview_kind == "local_preview" or bridge_preview_kind == "local_source_audio", "default bridge should prefer local converted audio truth after conversion")
-	_assert(bridge_shell_open_targets.size() == 1, "default bridge should auto-open the converted package once")
+	_assert(bridge_shell_open_targets.is_empty(), "default bridge should not auto-open the converted package when package validation is unavailable")
 	var bridge_package_record := bridge_state._selected_package_record()
 	var bridge_validation := Dictionary(bridge_package_record.get("validation", {}))
-	_assert(bool(bridge_validation.get("valid", false)), "default bridge package validation should pass for the synthetic fixture package")
+	var bridge_core_validation := Dictionary(bridge_validation.get("coreValidation", {}))
+	_assert(not bool(bridge_validation.get("valid", true)), "default bridge package validation should fail honestly when delegated validation is unavailable")
+	_assert(String(bridge_validation.get("delegatedValidator", "")) == "unavailable", "default bridge should surface delegated validator unavailability")
+	_assert(String(bridge_core_validation.get("delegatedValidator", "")) == "unavailable", "default bridge core validation should preserve unavailable truth")
+	_assert(_has_issue_code(Array(bridge_validation.get("issues", [])), "content_core_package_validator_unavailable"), "default bridge should surface the content-core validator unavailable issue")
+	_assert(bridge_state.action_button_text() == "Validation Failed", "default bridge CTA should not advance to Inspect when package validation is unavailable")
 	var bridge_package_dir := String(bridge_package_record.get("package_dir", ""))
 	_assert(_package_charts_have_beats(bridge_package_dir), "default bridge should save package charts with non-empty beats arrays")
 	_cleanup_directory(bridge_package_dir)
@@ -540,6 +545,12 @@ func _package_charts_have_beats(package_dir: String) -> bool:
 		if not chart_text.contains("beats:\n  - "):
 			return false
 	return true
+
+func _has_issue_code(issues: Array, code: String) -> bool:
+	for issue in issues:
+		if String(Dictionary(issue).get("code", "")) == code:
+			return true
+	return false
 
 func _assert(condition: bool, message: String) -> void:
 	if condition:

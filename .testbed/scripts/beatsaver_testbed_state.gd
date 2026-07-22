@@ -190,6 +190,7 @@ const ACTION_DOWNLOAD := "download"
 const ACTION_STAGING := "staging"
 const ACTION_CONVERTING := "converting"
 const ACTION_INSPECT := "inspect"
+const ACTION_VALIDATION_FAILED := "validation_failed"
 
 var facade
 var content_authoring
@@ -295,7 +296,7 @@ func run_selected_version_action(ui_host: Node, version_identifier: String = "")
 	selected_version_identifier = effective_identifier
 	_refresh_selected_package_truth()
 	var package_record: Dictionary = _selected_package_record()
-	if _record_has_local_package(package_record):
+	if _record_has_inspectable_package(package_record):
 		last_inspect_result = inspect_selected_version_package()
 		return last_inspect_result
 	busy = true
@@ -362,8 +363,9 @@ func run_selected_version_action(ui_host: Node, version_identifier: String = "")
 	var package_validation: Dictionary = content_authoring.validate_package_path(package_dir, "package")
 	save_result["validation"] = package_validation
 	var authored_audio := _extract_local_audio_truth(content_authoring.get_current_package_state(), package_dir)
+	var validation_ok: bool = _validation_allows_inspect(package_validation)
 	_set_package_record(_selected_package_key(), _merge_record(_selected_package_record(), {
-		"action": ACTION_INSPECT,
+		"action": ACTION_INSPECT if validation_ok else ACTION_VALIDATION_FAILED,
 		"progress_percent": 100,
 		"package_dir": package_dir,
 		"package_zip_path": String(save_result.get("zipPath", "")).strip_edges(),
@@ -374,11 +376,19 @@ func run_selected_version_action(ui_host: Node, version_identifier: String = "")
 		"validation": package_validation,
 	}))
 	busy = false
-	error_message = ""
+	error_message = "" if validation_ok else _validation_failure_message(package_validation)
 	emit_signal("state_changed")
-	last_inspect_result = inspect_selected_version_package()
+	if validation_ok:
+		last_inspect_result = inspect_selected_version_package()
+	else:
+		last_inspect_result = {
+			"ok": false,
+			"package_dir": package_dir,
+			"validation": package_validation,
+			"error": {"message": error_message},
+		}
 	return {
-		"ok": bool(last_inspect_result.get("ok", false)),
+		"ok": validation_ok and bool(last_inspect_result.get("ok", false)),
 		"stage": stage_result,
 		"convert": last_conversion_result,
 		"inspect": last_inspect_result,
@@ -454,6 +464,8 @@ func action_button_text() -> String:
 	match String(package_record.get("action", ACTION_DOWNLOAD)):
 		ACTION_INSPECT:
 			return "Inspect"
+		ACTION_VALIDATION_FAILED:
+			return "Validation Failed"
 		ACTION_STAGING:
 			return "Staging"
 		ACTION_CONVERTING:
@@ -629,6 +641,9 @@ func _record_has_local_package(record: Dictionary) -> bool:
 		return false
 	return DirAccess.dir_exists_absolute(package_dir) and FileAccess.file_exists(package_dir.path_join("song.package.yaml"))
 
+func _record_has_inspectable_package(record: Dictionary) -> bool:
+	return _record_has_local_package(record) and _validation_allows_inspect(Dictionary(record.get("validation", {})))
+
 func _refresh_selected_package_truth() -> void:
 	var key := _selected_package_key()
 	if key.is_empty():
@@ -636,7 +651,7 @@ func _refresh_selected_package_truth() -> void:
 	var record: Dictionary = _selected_package_record()
 	if _record_has_local_package(record):
 		_set_package_record(key, _merge_record(record, {
-			"action": ACTION_INSPECT,
+			"action": ACTION_INSPECT if _validation_allows_inspect(Dictionary(record.get("validation", {}))) else ACTION_VALIDATION_FAILED,
 			"download_started": true,
 			"progress_percent": 100,
 		}))
@@ -678,6 +693,21 @@ func _extract_conversion_error(result: Dictionary, fallback: String) -> String:
 	if result.has("message"):
 		return str(result.message)
 	return fallback
+
+func _validation_allows_inspect(report: Dictionary) -> bool:
+	if not bool(report.get("valid", false)):
+		return false
+	if report.has("delegatedValidator") and String(report.get("delegatedValidator", "")) == "unavailable":
+		return false
+	return true
+
+func _validation_failure_message(report: Dictionary) -> String:
+	var issues: Array = Array(report.get("issues", []))
+	if not issues.is_empty():
+		return String(Dictionary(issues[0]).get("message", "Converted package validation failed."))
+	if String(report.get("delegatedValidator", "unavailable")) == "unavailable":
+		return "Converted package validation is unavailable."
+	return "Converted package validation failed."
 
 func _extract_local_audio_truth(authoring_state: Dictionary, package_dir: String) -> Dictionary:
 	var songs: Array = Array(authoring_state.get("songs", []))
