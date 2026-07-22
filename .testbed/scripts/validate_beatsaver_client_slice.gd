@@ -407,7 +407,11 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	var bridge_preview_kind := String(bridge_state.selected_preview_target().get("kind", ""))
 	_assert(bridge_preview_kind == "local_preview" or bridge_preview_kind == "local_source_audio", "default bridge should prefer local converted audio truth after conversion")
 	_assert(bridge_shell_open_targets.size() == 1, "default bridge should auto-open the converted package once")
-	var bridge_package_dir := String(bridge_state._selected_package_record().get("package_dir", ""))
+	var bridge_package_record := bridge_state._selected_package_record()
+	var bridge_validation := Dictionary(bridge_package_record.get("validation", {}))
+	_assert(bool(bridge_validation.get("valid", false)), "default bridge package validation should pass for the synthetic fixture package")
+	var bridge_package_dir := String(bridge_package_record.get("package_dir", ""))
+	_assert(_package_charts_have_beats(bridge_package_dir), "default bridge should save package charts with non-empty beats arrays")
 	_cleanup_directory(bridge_package_dir)
 	bridge_state.select_map(first_map.map_id)
 	_assert(bridge_state.action_button_text() == "Download", "default bridge should fall back to Download after deleting the local package")
@@ -519,6 +523,23 @@ func _cleanup_directory(path: String) -> void:
 		else:
 			DirAccess.remove_absolute(child_path)
 	dir.list_dir_end()
+
+func _package_charts_have_beats(package_dir: String) -> bool:
+	if package_dir.is_empty():
+		return false
+	var charts_dir := package_dir.path_join("charts")
+	if not DirAccess.dir_exists_absolute(charts_dir):
+		return false
+	var chart_paths: PackedStringArray = DirAccess.get_files_at(charts_dir)
+	if chart_paths.is_empty():
+		return false
+	for chart_name in chart_paths:
+		if not chart_name.ends_with(".yaml") and not chart_name.ends_with(".yml"):
+			continue
+		var chart_text := FileAccess.get_file_as_string(charts_dir.path_join(chart_name))
+		if not chart_text.contains("beats:\n  - "):
+			return false
+	return true
 
 func _assert(condition: bool, message: String) -> void:
 	if condition:
