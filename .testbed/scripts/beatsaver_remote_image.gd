@@ -7,6 +7,10 @@ const PLACEHOLDER_ACCENT := Color("566079")
 
 var _request: HTTPRequest
 var _current_url: String = ""
+var _in_flight_url: String = ""
+var _loaded_url: String = ""
+var _failed_request_urls := {}
+var _failed_decode_urls := {}
 
 func _ready() -> void:
 	stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
@@ -18,10 +22,15 @@ func _ready() -> void:
 		_request.request_completed.connect(_on_request_completed)
 
 func set_image_url(url: String) -> void:
-	_current_url = url.strip_edges()
+	var normalized_url := url.strip_edges()
+	if normalized_url == _current_url and (_loaded_url == normalized_url or _in_flight_url == normalized_url or _failed_request_urls.has(normalized_url) or _failed_decode_urls.has(normalized_url)):
+		return
+	_current_url = normalized_url
 	tooltip_text = _current_url
 	texture = _build_placeholder_texture()
 	if _current_url.is_empty():
+		_loaded_url = ""
+		_in_flight_url = ""
 		return
 	if DisplayServer.get_name().to_lower() == "headless":
 		return
@@ -29,19 +38,29 @@ func set_image_url(url: String) -> void:
 		return
 	if _request.get_http_client_status() != HTTPClient.STATUS_DISCONNECTED:
 		_request.cancel_request()
+	_in_flight_url = _current_url
 	var request_error := _request.request(_current_url)
 	if request_error != OK:
-		push_warning("Failed to request BeatSaver cover image: %s" % error_string(request_error))
+		_in_flight_url = ""
+		_warn_request_failure_once(_current_url, request_error)
 
 func _on_request_completed(result: int, response_code: int, headers: PackedStringArray, body: PackedByteArray) -> void:
+	var request_url := _in_flight_url if not _in_flight_url.is_empty() else _current_url
+	_in_flight_url = ""
+	if request_url.is_empty() or request_url != _current_url:
+		return
 	if result != HTTPRequest.RESULT_SUCCESS or response_code < 200 or response_code >= 300 or body.is_empty():
+		_warn_request_failure_once(request_url, result if result != HTTPRequest.RESULT_SUCCESS else response_code)
 		return
 	var image := Image.new()
 	var content_type := _extract_header(headers, "content-type")
-	var load_error := _load_image_from_buffer(image, body, _current_url, content_type)
+	var load_error := _load_image_from_buffer(image, body, request_url, content_type)
 	if load_error != OK:
-		push_warning("Failed to decode BeatSaver cover image from %s: %s" % [_current_url, error_string(load_error)])
+		_warn_decode_failure_once(request_url, load_error)
 		return
+	_loaded_url = request_url
+	_failed_request_urls.erase(request_url)
+	_failed_decode_urls.erase(request_url)
 	texture = ImageTexture.create_from_image(image)
 
 func _extract_header(headers: PackedStringArray, header_name: String) -> String:
@@ -50,6 +69,18 @@ func _extract_header(headers: PackedStringArray, header_name: String) -> String:
 		if line.to_lower().begins_with(prefix):
 			return line.substr(line.find(":") + 1).strip_edges()
 	return ""
+
+func _warn_request_failure_once(url: String, error_code: int) -> void:
+	if _failed_request_urls.has(url):
+		return
+	_failed_request_urls[url] = true
+	push_warning("Failed to request BeatSaver cover image from %s: %s" % [url, error_string(error_code)])
+
+func _warn_decode_failure_once(url: String, error_code: int) -> void:
+	if _failed_decode_urls.has(url):
+		return
+	_failed_decode_urls[url] = true
+	push_warning("Failed to decode BeatSaver cover image from %s: %s" % [url, error_string(error_code)])
 
 func _load_image_from_buffer(image: Image, body: PackedByteArray, url: String, content_type: String) -> int:
 	var lower_type := content_type.to_lower()

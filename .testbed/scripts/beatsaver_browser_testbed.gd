@@ -36,6 +36,7 @@ var preview_stream_loader: Callable = Callable()
 var preview_remote_fetcher: Callable = Callable()
 var last_preview_cache_path: String = ""
 var _pending_preview_url: String = ""
+var _rendered_result_ids: PackedStringArray = []
 
 func _ready() -> void:
 	_setup_mode_picker()
@@ -257,8 +258,20 @@ func _render_state() -> void:
 	_download_button.disabled = state.action_button_disabled()
 	_preview_button.disabled = not bool(state.selected_preview_target().get("ok", false)) or state.selected_map == null
 	_update_results_grid_columns()
-	_rebuild_results_grid()
+	_render_results_grid()
 	_render_detail_panel()
+
+func _render_results_grid() -> void:
+	var visible_result_ids := _visible_result_ids()
+	if visible_result_ids != _rendered_result_ids:
+		_rebuild_results_grid()
+		_rendered_result_ids = visible_result_ids
+		return
+	for index in range(mini(_results_grid.get_child_count(), state.visible_results.size())):
+		var card = _results_grid.get_child(index)
+		var map_detail = state.visible_results[index]
+		card.bind_map(map_detail)
+		card.button_pressed = map_detail.map_id == state.selected_map_id
 
 func _rebuild_results_grid() -> void:
 	for child in _results_grid.get_children():
@@ -269,6 +282,12 @@ func _rebuild_results_grid() -> void:
 		card.button_pressed = map_detail.map_id == state.selected_map_id
 		card.map_chosen.connect(_on_card_chosen)
 		_results_grid.add_child(card)
+
+func _visible_result_ids() -> PackedStringArray:
+	var result_ids := PackedStringArray()
+	for map_detail in state.visible_results:
+		result_ids.append(String(map_detail.map_id))
+	return result_ids
 
 func _update_results_grid_columns() -> void:
 	var available_width := maxf(_results_scroll.size.x, float(RESULT_CARD_TARGET_WIDTH))

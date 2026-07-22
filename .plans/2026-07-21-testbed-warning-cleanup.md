@@ -134,14 +134,22 @@ Implementation commit for this coder slice: `53e4800` (`Fix BeatSaver testbed st
 - `src/`
 
 **Files Created/Deleted/Modified:**
+- `.testbed/scripts/beatsaver_browser_testbed.gd`
 - `.testbed/scripts/beatsaver_remote_image.gd`
-- `.testbed/scripts/beatsaver_testbed_state.gd`
-- any minimal supporting files required by the audit truth
 - `.plans/2026-07-21-testbed-warning-cleanup.md`
 
-**Status:** ⏳ Pending
+**Status:** ✅ Complete
 
-**Results:** Pending.
+**Results:** Implemented the narrowest runtime-loop fix in the hidden testbed by stopping repeated result-card teardown/recreation during unrelated `state_changed` emissions and by deduping identical remote-image requests/failure warnings. Exact code changes: `.testbed/scripts/beatsaver_browser_testbed.gd` now tracks the visible result ID list and only rebuilds the results grid when that list actually changes; otherwise it updates the existing cards in place so download/progress/status churn no longer recreates cards and re-enters `set_image_url(...)` for every result on every state tick. `.testbed/scripts/beatsaver_remote_image.gd` now short-circuits unchanged URLs when the image is already loaded, already in flight, or already failed in the current state; tracks the in-flight URL separately from the current selection; and emits request/decode warnings once per URL instead of on every rerender.
+
+Validation run:
+- `godot --headless --path .testbed --script /tmp/validate_warning_loop.gd`
+- `godot --headless --path .testbed --quit-after 3`
+- `godot --path .testbed --quit-after 3`
+
+Runtime truth: I did not reproduce Derrick’s exact resolver failure live against BeatSaver itself in this lane, but I did validate the actual loop multiplier locally with a headless Godot harness that instantiates the testbed, emits repeated non-result `state_changed` updates, and proves the result-card node identities stay stable instead of being rebuilt. That source/runtime check covers the rerender trigger identified in Task 1. The remote-image script now also guards the remaining warning path so an identical failed URL does not spam across repeated renders.
+
+Implementation commit for this coder slice: `PENDING_COMMIT_HASH` (`Fix BeatSaver warning loop rerenders`).
 
 ---
 
