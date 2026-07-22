@@ -97,14 +97,24 @@ class FakeContentAuthoringService:
 		}
 		return {"ok": true, "state": _current_state}
 
+	func inspect_beatsaver_stage_source(stage_dir: String, options: Dictionary = {}) -> Dictionary:
+		return {"ok": true, "stageDir": stage_dir, "options": options}
+
+	func validate_package_path(package_dir: String, subject: String = "package") -> Dictionary:
+		return {"ok": true, "valid": true, "subject": subject, "packageDir": package_dir, "issues": []}
+
 	func save_current_package(destination_dir: String) -> Dictionary:
 		save_calls += 1
 		DirAccess.make_dir_recursive_absolute(destination_dir)
 		var output_dir := destination_dir.path_join("%s-package" % _last_package_token)
 		DirAccess.make_dir_recursive_absolute(output_dir.path_join("media/audio"))
-		var package_file := FileAccess.open(output_dir.path_join("song-package.yaml"), FileAccess.WRITE)
-		package_file.store_string("songPackageId: ab-songpkg-%s\n" % _last_package_token)
+		DirAccess.make_dir_recursive_absolute(output_dir.path_join("charts"))
+		var package_file := FileAccess.open(output_dir.path_join("song.package.yaml"), FileAccess.WRITE)
+		package_file.store_string("schemaId: aerobeat.song-package.v1\nschemaVersion: 1\nrecordVersion: 1\nsongPackageId: ab-songpkg-%s\nsongPackageName: %s Package\npackageVersion: 1.0.0\nsong:\n  schemaId: aerobeat.song.v1\n  schemaVersion: 1\n  recordVersion: 1\n  songId: ab-song-%s\n  songName: %s\n  audio:\n    filePath: media/audio/%s.wav\n    previewFilePath: media/audio/%s-preview.wav\n    previewMode: preview_file\ncharts:\n  - setId: ab-set-%s\n    setName: %s Normal\n    chartId: ab-chart-%s\n    path: charts/ab-chart-%s.yaml\n" % [_last_package_token, _last_package_token.capitalize(), _last_package_token, _last_package_token.capitalize(), _last_package_token, _last_package_token, _last_package_token, _last_package_token.capitalize(), _last_package_token, _last_package_token])
 		package_file.close()
+		var chart_file := FileAccess.open(output_dir.path_join("charts/ab-chart-%s.yaml" % _last_package_token), FileAccess.WRITE)
+		chart_file.store_string("schemaId: aerobeat.chart.boxing.v1\nschemaVersion: 1\nrecordVersion: 1\nchartId: ab-chart-%s\nchartName: %s Normal\nfeature: boxing\ndifficulty: Normal\nbeats:\n  - start: 1.0\n    type: straight_left\n" % [_last_package_token, _last_package_token.capitalize()])
+		chart_file.close()
 		var audio_file := FileAccess.open(output_dir.path_join("media/audio/%s.wav" % _last_package_token), FileAccess.WRITE)
 		audio_file.store_buffer(_build_silent_wav_bytes())
 		audio_file.close()

@@ -17,6 +17,13 @@ class ContentAuthoringBridge:
 		_conversion_service = conversion_script.new() if conversion_script != null else null
 		_workflow_service = workflow_script.new() if workflow_script != null else null
 
+	func inspect_beatsaver_stage_source(stage_dir: String, options: Dictionary = {}) -> Dictionary:
+		if _conversion_service == null:
+			return {"ok": false, "error": {"message": "BeatSaver conversion service could not be loaded from aerobeat-tool-content-authoring."}}
+		if _conversion_service.has_method("inspect_stage"):
+			return _conversion_service.inspect_stage(stage_dir, options)
+		return {"ok": false, "error": {"message": "BeatSaver stage inspection is unavailable."}}
+
 	func convert_beatsaver_stage_to_current_package(stage_dir: String, options: Dictionary = {}) -> Dictionary:
 		if _conversion_service == null:
 			return {"ok": false, "error": {"message": "BeatSaver conversion service could not be loaded from aerobeat-tool-content-authoring."}}
@@ -25,6 +32,16 @@ class ContentAuthoringBridge:
 			_current_state = Dictionary(result.get("state", {})).duplicate(true)
 			result["state"] = get_current_package_state()
 		return result
+
+	func validate_package_path(package_dir: String, subject: String = "package") -> Dictionary:
+		var validation_service_path := "res://addons/aerobeat-tool-content-authoring/src/services/validation/song_package_validation_service.gd"
+		var validation_script = load(validation_service_path)
+		if validation_script == null:
+			return {"ok": false, "valid": false, "issues": [{"code": "validation_service_unavailable", "message": "BeatSaver validation bridge could not load the shared package validator."}]}
+		var service = validation_script.new()
+		var report: Dictionary = service.validate_path(package_dir, subject)
+		report["ok"] = bool(report.get("valid", false))
+		return report
 
 	func save_current_package(destination_dir: String) -> Dictionary:
 		if _workflow_service == null:
@@ -314,11 +331,19 @@ func run_selected_version_action(ui_host: Node, version_identifier: String = "")
 	if ui_host != null and ui_host.get_tree() != null:
 		await ui_host.get_tree().process_frame
 	var stage_dir := String(stage_data.get("stage_directory_path", ""))
+	var stage_inspect_result: Dictionary = content_authoring.inspect_beatsaver_stage_source(stage_dir)
+	if not bool(stage_inspect_result.get("ok", false)):
+		busy = false
+		error_message = _extract_conversion_error(stage_inspect_result, "Failed to inspect the staged BeatSaver package.")
+		_set_package_record(_selected_package_key(), _build_record_state(effective_identifier, ACTION_DOWNLOAD, 0, _selected_package_record()))
+		emit_signal("state_changed")
+		return stage_inspect_result
 	_set_package_record(_selected_package_key(), _build_record_state(effective_identifier, ACTION_CONVERTING, 100, _selected_package_record()))
 	emit_signal("state_changed")
 	if ui_host != null and ui_host.get_tree() != null:
 		await ui_host.get_tree().process_frame
 	last_conversion_result = content_authoring.convert_beatsaver_stage_to_current_package(stage_dir)
+	last_conversion_result["inspectStage"] = stage_inspect_result
 	if not last_conversion_result.get("ok", false):
 		busy = false
 		error_message = _extract_conversion_error(last_conversion_result, "Failed to convert the staged BeatSaver package.")
@@ -334,6 +359,8 @@ func run_selected_version_action(ui_host: Node, version_identifier: String = "")
 		emit_signal("state_changed")
 		return save_result
 	var package_dir := String(save_result.get("outputDir", "")).strip_edges()
+	var package_validation: Dictionary = content_authoring.validate_package_path(package_dir, "package")
+	save_result["validation"] = package_validation
 	var authored_audio := _extract_local_audio_truth(content_authoring.get_current_package_state(), package_dir)
 	_set_package_record(_selected_package_key(), _merge_record(_selected_package_record(), {
 		"action": ACTION_INSPECT,
@@ -344,6 +371,7 @@ func run_selected_version_action(ui_host: Node, version_identifier: String = "")
 		"local_source_audio_path": String(authored_audio.get("local_source_audio_path", "")).strip_edges(),
 		"remote_preview_url": String(authored_audio.get("remote_preview_url", _selected_remote_preview_url())).strip_edges(),
 		"song_audio": Dictionary(authored_audio.get("song_audio", {})).duplicate(true),
+		"validation": package_validation,
 	}))
 	busy = false
 	error_message = ""
@@ -463,10 +491,17 @@ func selected_version_options() -> Array:
 				diff_labels.append(difficulty_name)
 			else:
 				diff_labels.append("%s/%s" % [characteristic, difficulty_name])
-			options.append({
+		diff_labels.sort()
+		var display_key: String = version_ref.key if not version_ref.key.is_empty() else version_ref.hash.substr(0, min(version_ref.hash.length(), 8))
+		var hash_short: String = version_ref.hash.substr(0, min(version_ref.hash.length(), 8))
+		var difficulty_summary: String = ", ".join(diff_labels)
+		var label: String = "%s • %s" % [display_key, hash_short]
+		if not difficulty_summary.is_empty():
+			label += " • %s" % difficulty_summary
+		options.append({
 			"id": version_ref.hash,
 			"key": version_ref.key,
-			"label": "%s • %s • %d diff%s" % [version_ref.key if not version_ref.key.is_empty() else version_ref.hash.substr(0, min(version_ref.hash.length(), 8)), version_ref.hash.substr(0, min(version_ref.hash.length(), 8)), version_ref.difficulties.size(), "s" if version_ref.difficulties.size() != 1 else ""],
+			"label": label,
 			"download_url": version_ref.download_url,
 			"cover_url": version_ref.cover_url,
 			"preview_url": version_ref.preview_url,
@@ -592,7 +627,7 @@ func _record_has_local_package(record: Dictionary) -> bool:
 	var package_dir := String(record.get("package_dir", "")).strip_edges()
 	if package_dir.is_empty():
 		return false
-	return DirAccess.dir_exists_absolute(package_dir) and FileAccess.file_exists(package_dir.path_join("song-package.yaml"))
+	return DirAccess.dir_exists_absolute(package_dir) and FileAccess.file_exists(package_dir.path_join("song.package.yaml"))
 
 func _refresh_selected_package_truth() -> void:
 	var key := _selected_package_key()
