@@ -1,9 +1,6 @@
 class_name BeatSaverTestbedState
 extends RefCounted
 
-const BeatSaverVendorFacade = preload("res://addons/aerobeat-vendor-beatsaver/src/facade/beatsaver_vendor_facade.gd")
-const BeatSaverSearchQuery = preload("res://addons/aerobeat-vendor-beatsaver/src/models/beatsaver_search_query.gd")
-
 class ContentAuthoringBridge:
 	extends RefCounted
 
@@ -572,8 +569,8 @@ func _set_package_record(key: String, record: Dictionary) -> void:
 		return
 	package_records[key] = record.duplicate(true)
 
-func _build_record_state(version_identifier: String, action: String, progress_percent: int, seed: Dictionary) -> Dictionary:
-	var record := _merge_record(seed, {
+func _build_record_state(version_identifier: String, action: String, progress_percent: int, seed_record: Dictionary) -> Dictionary:
+	var record := _merge_record(seed_record, {
 		"map_id": selected_map_id,
 		"version_identifier": version_identifier,
 		"action": action,

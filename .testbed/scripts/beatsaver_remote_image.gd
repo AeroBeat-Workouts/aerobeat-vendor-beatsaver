@@ -44,8 +44,8 @@ func _on_request_completed(result: int, response_code: int, headers: PackedStrin
 		return
 	texture = ImageTexture.create_from_image(image)
 
-func _extract_header(headers: PackedStringArray, name: String) -> String:
-	var prefix := "%s:" % name.to_lower()
+func _extract_header(headers: PackedStringArray, header_name: String) -> String:
+	var prefix := "%s:" % header_name.to_lower()
 	for line in headers:
 		if line.to_lower().begins_with(prefix):
 			return line.substr(line.find(":") + 1).strip_edges()
@@ -72,7 +72,9 @@ func _build_placeholder_texture() -> Texture2D:
 	var image := Image.create(PLACEHOLDER_SIZE.x, PLACEHOLDER_SIZE.y, false, Image.FORMAT_RGBA8)
 	image.fill(PLACEHOLDER_COLOR)
 	for y in range(PLACEHOLDER_SIZE.y):
+		var tile_y := floori(float(y) / 24.0)
 		for x in range(PLACEHOLDER_SIZE.x):
-			if int((x / 24) + (y / 24)) % 2 == 0:
+			var tile_x := floori(float(x) / 24.0)
+			if (tile_x + tile_y) % 2 == 0:
 				image.set_pixel(x, y, PLACEHOLDER_ACCENT)
 	return ImageTexture.create_from_image(image)

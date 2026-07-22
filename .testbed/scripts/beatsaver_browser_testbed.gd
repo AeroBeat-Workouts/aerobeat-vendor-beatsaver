@@ -1,8 +1,6 @@
 class_name BeatSaverBrowserTestbed
 extends Control
 
-const BeatSaverVendorFacade = preload("res://addons/aerobeat-vendor-beatsaver/src/facade/beatsaver_vendor_facade.gd")
-const BeatSaverTestbedState = preload("res://scripts/beatsaver_testbed_state.gd")
 const RESULT_CARD_SCENE = preload("res://scenes/beatsaver_result_card.tscn")
 const RESULT_CARD_TARGET_WIDTH := 280
 const RESULT_CARD_MAX_COLUMNS := 2
@@ -213,8 +211,8 @@ func _preview_extension(url: String, headers: PackedStringArray) -> String:
 			return extension
 	return "mp3"
 
-func _extract_header(headers: PackedStringArray, name: String) -> String:
-	var prefix := "%s:" % name.to_lower()
+func _extract_header(headers: PackedStringArray, header_name: String) -> String:
+	var prefix := "%s:" % header_name.to_lower()
 	for line in headers:
 		if line.to_lower().begins_with(prefix):
 			return line.substr(line.find(":") + 1).strip_edges()
@@ -297,7 +295,7 @@ func _render_detail_panel() -> void:
 	_preview_button.text = state.preview_button_text()
 	_download_button.text = state.action_button_text()
 
-func _rebuild_versions(detail: Dictionary) -> void:
+func _rebuild_versions(_detail: Dictionary) -> void:
 	_version_option_button.clear()
 	var options := state.selected_version_options()
 	var selected_index := -1
