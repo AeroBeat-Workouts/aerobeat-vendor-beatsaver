@@ -149,7 +149,7 @@ Validation run:
 
 Runtime truth: I did not reproduce Derrick’s exact resolver failure live against BeatSaver itself in this lane, but I did validate the actual loop multiplier locally with a headless Godot harness that instantiates the testbed, emits repeated non-result `state_changed` updates, and proves the result-card node identities stay stable instead of being rebuilt. That source/runtime check covers the rerender trigger identified in Task 1. The remote-image script now also guards the remaining warning path so an identical failed URL does not spam across repeated renders.
 
-Implementation commit for this coder slice: `PENDING_COMMIT_HASH` (`Fix BeatSaver warning loop rerenders`).
+Implementation commit for this coder slice: `b4b089c` (`Fix BeatSaver warning loop rerenders`).
 
 ---
 
