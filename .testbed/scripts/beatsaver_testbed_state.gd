@@ -197,13 +197,12 @@ var content_authoring
 var artifact_root: String
 var mode: String = "latest"
 var remote_query_text: String = "fitbeat"
-var local_filter_text: String = ""
-var tag_filter_text: String = ""
+var selected_tag_filters: PackedStringArray = PackedStringArray()
 var page_size: int = 12
 var include_automapper = null
 var latest_sort: String = "latest"
 var search_sort_order: String = "relevance"
-var difficulty_filter: String = ""
+var selected_difficulty_filters: PackedStringArray = PackedStringArray()
 var current_page: int = 0
 var total_pages: int = 0
 var all_results: Array = []
@@ -233,7 +232,7 @@ func load_search(query_text: String = "", page: int = 0, append: bool = false) -
 	busy = true
 	error_message = ""
 	emit_signal("state_changed")
-	var response: Dictionary = facade.search_maps(BeatSaverSearchQuery.new(remote_query_text, page, page_size, search_sort_order, include_automapper, PackedStringArray(), difficulty_filter))
+	var response: Dictionary = facade.search_maps(BeatSaverSearchQuery.new(remote_query_text, page, page_size, search_sort_order, include_automapper, PackedStringArray(), ""))
 	busy = false
 	return _consume_collection_response(response, append)
 
@@ -268,12 +267,52 @@ func can_load_more_search_results() -> bool:
 		return false
 	return current_page + 1 < total_pages
 
-func set_filters(text_filter: String, tag_filter: String = "", p_difficulty_filter: String = "") -> void:
-	local_filter_text = text_filter.strip_edges()
-	tag_filter_text = tag_filter.strip_edges() if not tag_filter.is_empty() else ""
-	difficulty_filter = BeatSaverSearchQuery.new("", 0, page_size, "", null, PackedStringArray(), p_difficulty_filter).difficulty_filter
+func set_filters(tag_filters: PackedStringArray = PackedStringArray(), difficulty_filters: PackedStringArray = PackedStringArray()) -> void:
+	selected_tag_filters = _sanitize_tag_filters(tag_filters)
+	selected_difficulty_filters = _sanitize_difficulty_filters(difficulty_filters)
 	_rebuild_visible_results()
 	emit_signal("state_changed")
+
+func selected_genre_tags() -> PackedStringArray:
+	return selected_tag_filters.duplicate()
+
+func selected_difficulties() -> PackedStringArray:
+	return selected_difficulty_filters.duplicate()
+
+func available_genre_tags() -> PackedStringArray:
+	var seen := {}
+	var options := PackedStringArray()
+	for map_detail in all_results:
+		if map_detail == null:
+			continue
+		for raw_tag in map_detail.tags:
+			var normalized_tag := str(raw_tag).strip_edges()
+			if normalized_tag.is_empty() or seen.has(normalized_tag):
+				continue
+			seen[normalized_tag] = true
+			options.append(normalized_tag)
+	options.sort()
+	return options
+
+func available_difficulties() -> PackedStringArray:
+	var order := PackedStringArray(["Easy", "Normal", "Hard", "Expert", "ExpertPlus"])
+	var available := {}
+	for map_detail in all_results:
+		if map_detail == null:
+			continue
+		for version_ref in map_detail.versions:
+			for difficulty_ref in version_ref.difficulties:
+				var normalized := _normalize_difficulty_name(String(difficulty_ref.difficulty))
+				if not normalized.is_empty():
+					available[normalized] = true
+	for difficulty_name in selected_difficulty_filters:
+		if not difficulty_name.is_empty():
+			available[difficulty_name] = true
+	var options := PackedStringArray()
+	for difficulty_name in order:
+		if available.is_empty() or available.has(difficulty_name):
+			options.append(difficulty_name)
+	return options
 
 func select_map(map_id: String) -> Dictionary:
 	var normalized_id := map_id.strip_edges().to_upper()
@@ -609,28 +648,59 @@ func _rebuild_visible_results() -> void:
 func _matches_filters(map_detail) -> bool:
 	if map_detail == null:
 		return false
-	var text_filter := local_filter_text.to_lower()
-	if not text_filter.is_empty() and not map_detail.search_text().to_lower().contains(text_filter):
+	if not selected_tag_filters.is_empty() and not _map_has_any_tag(map_detail, selected_tag_filters):
 		return false
-	var normalized_tag_filter := tag_filter_text.to_lower()
-	if not normalized_tag_filter.is_empty():
-		var tag_match := false
-		for tag in map_detail.tags:
-			if str(tag).to_lower().contains(normalized_tag_filter):
-				tag_match = true
-				break
-		if not tag_match:
-			return false
-	if not difficulty_filter.is_empty() and not _map_has_difficulty(map_detail, difficulty_filter):
+	if not selected_difficulty_filters.is_empty() and not _map_has_any_difficulty(map_detail, selected_difficulty_filters):
 		return false
 	return true
 
-func _map_has_difficulty(map_detail, normalized_difficulty: String) -> bool:
+func _map_has_any_tag(map_detail, required_tags: PackedStringArray) -> bool:
+	var map_tags := {}
+	for raw_tag in map_detail.tags:
+		var normalized_tag := str(raw_tag).strip_edges()
+		if not normalized_tag.is_empty():
+			map_tags[normalized_tag.to_lower()] = true
+	for required_tag in required_tags:
+		if map_tags.has(String(required_tag).to_lower()):
+			return true
+	return false
+
+func _map_has_any_difficulty(map_detail, normalized_difficulties: PackedStringArray) -> bool:
+	var wanted := {}
+	for difficulty_name in normalized_difficulties:
+		wanted[String(difficulty_name)] = true
 	for version_ref in map_detail.versions:
 		for difficulty_ref in version_ref.difficulties:
-			if _normalize_difficulty_name(String(difficulty_ref.difficulty)) == normalized_difficulty:
+			if wanted.has(_normalize_difficulty_name(String(difficulty_ref.difficulty))):
 				return true
 	return false
+
+func _sanitize_tag_filters(raw_tags: PackedStringArray) -> PackedStringArray:
+	var normalized := PackedStringArray()
+	var seen := {}
+	for raw_tag in raw_tags:
+		var tag_text := str(raw_tag).strip_edges()
+		if tag_text.is_empty():
+			continue
+		var seen_key := tag_text.to_lower()
+		if seen.has(seen_key):
+			continue
+		seen[seen_key] = true
+		normalized.append(tag_text)
+	return normalized
+
+func _sanitize_difficulty_filters(raw_difficulties: PackedStringArray) -> PackedStringArray:
+	var normalized := PackedStringArray()
+	var seen := {}
+	for raw_difficulty in raw_difficulties:
+		var difficulty_name := _normalize_difficulty_name(str(raw_difficulty))
+		if difficulty_name.is_empty():
+			continue
+		if seen.has(difficulty_name):
+			continue
+		seen[difficulty_name] = true
+		normalized.append(difficulty_name)
+	return normalized
 
 func _normalize_difficulty_name(raw_difficulty: String) -> String:
 	return BeatSaverSearchQuery.new("", 0, page_size, "", null, PackedStringArray(), raw_difficulty).difficulty_filter

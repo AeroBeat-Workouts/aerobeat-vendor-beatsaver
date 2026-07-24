@@ -419,13 +419,13 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	_assert(state.can_load_more_search_results(), "search state should expose when additional pages are available")
 
 	var first_map = state.visible_results[0]
-	state.set_filters(first_map.map_id, "", "")
-	_assert(state.visible_result_count() == 1, "local text filter should narrow visible results")
-	state.set_filters("", str(first_map.tags[0]) if first_map.tags.size() > 0 else "", "")
-	_assert(state.visible_result_count() >= 1, "tag filter should preserve matching result")
-	state.set_filters("", "", "Normal")
+	state.set_filters(PackedStringArray([str(first_map.tags[0]) if first_map.tags.size() > 0 else ""]), PackedStringArray())
+	_assert(state.visible_result_count() >= 1, "BeatSaver tag-backed genre filter should preserve matching results")
+	state.set_filters(PackedStringArray(), PackedStringArray(["Normal"]))
 	_assert(state.visible_result_count() == 1, "difficulty filter should narrow results through the wrapper layer without inventing upstream params")
-	state.set_filters("", "", "")
+	state.set_filters(PackedStringArray(), PackedStringArray(["Normal", "ExpertPlus"]))
+	_assert(state.visible_result_count() == 2, "difficulty multi-select should preserve maps matching any selected difficulty")
+	state.set_filters()
 
 	var next_page_result := state.load_next_page()
 	_assert(next_page_result.get("ok", false), "search state should load the next results page when available")
@@ -505,11 +505,10 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	browser.size = Vector2(980, 720)
 	await process_frame
 	var search_order_button: OptionButton = browser.get_node("RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/SearchOrderOptionButton")
-	var difficulty_button: OptionButton = browser.get_node("RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/DifficultyOptionButton")
+	var genre_button: MenuButton = browser.get_node("RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/GenreTagsMenuButton")
+	var difficulty_button: MenuButton = browser.get_node("RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/DifficultyMenuButton")
 	search_order_button.select(2)
 	search_order_button.emit_signal("item_selected", 2)
-	difficulty_button.select(0)
-	difficulty_button.emit_signal("item_selected", 0)
 	await process_frame
 	browser.state.load_search("fitbeat")
 	await process_frame
@@ -517,14 +516,28 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	var results_grid = browser.get_node("RootMargin/RootLayout/BodyLayout/ResultsPanel/ResultsMargin/ResultsVBox/ResultsScroll/ResultsGrid")
 	_assert(results_grid.get_child_count() == browser.state.visible_result_count(), "browser scene should render one card per visible result")
 	_assert(results_grid.columns >= 1 and results_grid.columns <= 2, "results grid should use a bounded adaptive column count")
-	difficulty_button.select(2)
-	difficulty_button.emit_signal("item_selected", 2)
-	await process_frame
-	_assert(browser.state.difficulty_filter == "Normal", "browser scene should pass difficulty filter selection through the wrapper state")
-	_assert(browser.state.visible_result_count() == 1, "browser difficulty filter should narrow visible results without UI-owned difficulty logic")
-	difficulty_button.select(0)
-	difficulty_button.emit_signal("item_selected", 0)
-	await process_frame
+	var genre_popup := genre_button.get_popup()
+	if genre_popup.item_count > 0:
+		browser._on_genre_tag_option_pressed(0)
+		await process_frame
+		_assert(browser.state.selected_genre_tags().size() == 1, "browser scene should pass BeatSaver tag selections through the wrapper state")
+		_assert(browser.state.visible_result_count() >= 1, "browser genre dropdown should preserve matching BeatSaver tag results")
+		browser._on_genre_tag_option_pressed(0)
+		await process_frame
+	var difficulty_popup := difficulty_button.get_popup()
+	var normal_index := -1
+	for index in range(difficulty_popup.item_count):
+		if String(difficulty_popup.get_item_metadata(index)) == "Normal":
+			normal_index = index
+			break
+	_assert(normal_index >= 0, "browser difficulty popup should expose Normal as a selectable local filter")
+	if normal_index >= 0:
+		browser._on_difficulty_option_pressed(normal_index)
+		await process_frame
+		_assert(browser.state.selected_difficulties().has("Normal"), "browser scene should pass difficulty selections through the wrapper state")
+		_assert(browser.state.visible_result_count() == 1, "browser difficulty filter should narrow visible results without UI-owned difficulty logic")
+		browser._on_difficulty_option_pressed(normal_index)
+		await process_frame
 	var scroll_container: ScrollContainer = browser.get_node("RootMargin/RootLayout/BodyLayout/ResultsPanel/ResultsMargin/ResultsVBox/ResultsScroll")
 	var scroll_bar := scroll_container.get_v_scroll_bar()
 	if scroll_bar != null:

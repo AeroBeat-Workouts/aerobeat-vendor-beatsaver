@@ -14,9 +14,8 @@ signal preview_request_finished(result: Dictionary)
 @onready var _mode_option_button: OptionButton = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/ModeOptionButton
 @onready var _query_line_edit: LineEdit = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/QueryLineEdit
 @onready var _search_order_option_button: OptionButton = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/SearchOrderOptionButton
-@onready var _filter_line_edit: LineEdit = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/FilterLineEdit
-@onready var _tag_filter_line_edit: LineEdit = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/TagFilterLineEdit
-@onready var _difficulty_option_button: OptionButton = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/DifficultyOptionButton
+@onready var _genre_tags_menu_button: MenuButton = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/GenreTagsMenuButton
+@onready var _difficulty_menu_button: MenuButton = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/DifficultyMenuButton
 @onready var _refresh_button: Button = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/RefreshButton
 @onready var _results_summary_label: Label = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/StatusRow/ResultsSummaryLabel
 @onready var _status_label: Label = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/StatusRow/StatusLabel
@@ -44,7 +43,7 @@ var _load_more_requested: bool = false
 func _ready() -> void:
 	_setup_mode_picker()
 	_setup_search_order_picker()
-	_setup_difficulty_picker()
+	_setup_filter_menus()
 	_wire_ui()
 	if state == null:
 		state = BeatSaverTestbedState.new(BeatSaverVendorFacade.new(), "res://.artifacts")
@@ -56,10 +55,8 @@ func _ready() -> void:
 	if not _preview_http_request.request_completed.is_connected(_on_preview_request_completed):
 		_preview_http_request.request_completed.connect(_on_preview_request_completed)
 	_query_line_edit.text = state.remote_query_text
-	_filter_line_edit.text = state.local_filter_text
-	_tag_filter_line_edit.text = state.tag_filter_text
 	_select_search_order(state.search_sort_order)
-	_select_difficulty_filter(state.difficulty_filter)
+	_sync_filter_menus()
 	_mode_option_button.select(0 if state.mode == "latest" else 1)
 	if auto_bootstrap:
 		state.refresh_active_mode()
@@ -76,18 +73,25 @@ func _setup_search_order_picker() -> void:
 	for label in ["Relevance", "Latest", "Rating"]:
 		_search_order_option_button.add_item(label)
 
-func _setup_difficulty_picker() -> void:
-	_difficulty_option_button.clear()
-	for label in ["Any Difficulty", "Easy", "Normal", "Hard", "Expert", "ExpertPlus"]:
-		_difficulty_option_button.add_item(label)
+func _setup_filter_menus() -> void:
+	_configure_multi_select_popup(_genre_tags_menu_button.get_popup())
+	_configure_multi_select_popup(_difficulty_menu_button.get_popup())
+	var genre_popup := _genre_tags_menu_button.get_popup()
+	if not genre_popup.id_pressed.is_connected(_on_genre_tag_option_pressed):
+		genre_popup.id_pressed.connect(_on_genre_tag_option_pressed)
+	var difficulty_popup := _difficulty_menu_button.get_popup()
+	if not difficulty_popup.id_pressed.is_connected(_on_difficulty_option_pressed):
+		difficulty_popup.id_pressed.connect(_on_difficulty_option_pressed)
+
+func _configure_multi_select_popup(popup: PopupMenu) -> void:
+	popup.hide_on_checkable_item_selection = false
+	popup.hide_on_item_selection = false
+	popup.hide_on_state_item_selection = false
 
 func _wire_ui() -> void:
 	_mode_option_button.item_selected.connect(_on_mode_selected)
 	_query_line_edit.text_submitted.connect(_on_query_submitted)
 	_search_order_option_button.item_selected.connect(_on_search_order_selected)
-	_filter_line_edit.text_changed.connect(_on_filter_changed)
-	_tag_filter_line_edit.text_changed.connect(_on_tag_filter_changed)
-	_difficulty_option_button.item_selected.connect(_on_difficulty_selected)
 	_refresh_button.pressed.connect(_on_refresh_pressed)
 	_version_option_button.item_selected.connect(_on_version_selected)
 	_preview_button.pressed.connect(_on_preview_pressed)
@@ -115,22 +119,23 @@ func _on_refresh_pressed() -> void:
 		return
 	state.load_latest()
 
-func _on_filter_changed(_value: String) -> void:
-	_apply_local_filters()
+func _on_genre_tag_option_pressed(item_id: int) -> void:
+	var selected_tags := state.selected_genre_tags()
+	var toggled_value := String(_genre_tags_menu_button.get_popup().get_item_metadata(item_id))
+	if _packed_string_array_has(selected_tags, toggled_value):
+		selected_tags = _packed_string_array_without(selected_tags, toggled_value)
+	else:
+		selected_tags.append(toggled_value)
+	state.set_filters(selected_tags, state.selected_difficulties())
 
-func _on_tag_filter_changed(_value: String) -> void:
-	_apply_local_filters()
-
-func _on_difficulty_selected(_index: int) -> void:
-	_apply_local_filters()
-
-func _apply_local_filters() -> void:
-	state.set_filters(_filter_line_edit.text, _tag_filter_line_edit.text, _selected_difficulty_filter())
-
-func _selected_difficulty_filter() -> String:
-	if _difficulty_option_button.selected <= 0:
-		return ""
-	return _difficulty_option_button.get_item_text(_difficulty_option_button.selected)
+func _on_difficulty_option_pressed(item_id: int) -> void:
+	var selected_difficulties := state.selected_difficulties()
+	var toggled_value := String(_difficulty_menu_button.get_popup().get_item_metadata(item_id))
+	if _packed_string_array_has(selected_difficulties, toggled_value):
+		selected_difficulties = _packed_string_array_without(selected_difficulties, toggled_value)
+	else:
+		selected_difficulties.append(toggled_value)
+	state.set_filters(state.selected_genre_tags(), selected_difficulties)
 
 func _search_order_value(index: int) -> String:
 	match index:
@@ -151,13 +156,54 @@ func _select_search_order(sort_order: String) -> void:
 		_:
 			_search_order_option_button.select(0)
 
-func _select_difficulty_filter(filter_name: String) -> void:
-	var normalized := filter_name.strip_edges().to_lower()
-	for index in range(_difficulty_option_button.item_count):
-		if _difficulty_option_button.get_item_text(index).to_lower() == normalized:
-			_difficulty_option_button.select(index)
-			return
-	_difficulty_option_button.select(0)
+func _sync_filter_menus() -> void:
+	_rebuild_multi_select_popup(_genre_tags_menu_button, state.available_genre_tags(), state.selected_genre_tags())
+	_rebuild_multi_select_popup(_difficulty_menu_button, state.available_difficulties(), state.selected_difficulties())
+	_genre_tags_menu_button.text = _multi_select_button_text("Genres (BeatSaver tags)", state.selected_genre_tags(), func(value: String) -> String:
+		return _display_genre_tag(value)
+	)
+	_difficulty_menu_button.text = _multi_select_button_text("Any Difficulty", state.selected_difficulties())
+
+func _rebuild_multi_select_popup(button: MenuButton, options: PackedStringArray, selected_values: PackedStringArray) -> void:
+	var popup := button.get_popup()
+	popup.clear()
+	for index in range(options.size()):
+		var option_value := String(options[index])
+		popup.add_check_item(_display_genre_tag(option_value) if button == _genre_tags_menu_button else option_value, index)
+		popup.set_item_metadata(index, option_value)
+		popup.set_item_checked(index, _packed_string_array_has(selected_values, option_value))
+
+func _multi_select_button_text(empty_text: String, selected_values: PackedStringArray, formatter: Callable = Callable()) -> String:
+	if selected_values.is_empty():
+		return empty_text
+	var labels := PackedStringArray()
+	for value in selected_values:
+		labels.append(String(formatter.call(value)) if formatter.is_valid() else String(value))
+	if labels.size() <= 2:
+		return ", ".join(labels)
+	return "%d selected" % labels.size()
+
+func _display_genre_tag(tag_value: String) -> String:
+	var words := PackedStringArray()
+	for raw_word in tag_value.replace("-", " ").split(" ", false):
+		var word := String(raw_word).strip_edges()
+		if word.is_empty():
+			continue
+		words.append(word.substr(0, 1).to_upper() + word.substr(1).to_lower())
+	return " ".join(words)
+
+func _packed_string_array_has(values: PackedStringArray, target: String) -> bool:
+	for value in values:
+		if String(value) == target:
+			return true
+	return false
+
+func _packed_string_array_without(values: PackedStringArray, target: String) -> PackedStringArray:
+	var filtered := PackedStringArray()
+	for value in values:
+		if String(value) != target:
+			filtered.append(String(value))
+	return filtered
 
 func _on_version_selected(index: int) -> void:
 	if index < 0:
@@ -320,8 +366,10 @@ func _render_state() -> void:
 	_status_label.text = state.current_status_text()
 	_query_line_edit.editable = not state.busy
 	_search_order_option_button.disabled = state.busy or state.mode != "search"
-	_difficulty_option_button.disabled = state.busy
+	_genre_tags_menu_button.disabled = state.busy
+	_difficulty_menu_button.disabled = state.busy
 	_refresh_button.disabled = state.busy
+	_sync_filter_menus()
 	_download_button.disabled = state.action_button_disabled()
 	_preview_button.disabled = not bool(state.selected_preview_target().get("ok", false)) or state.selected_map == null
 	_update_results_grid_columns()
@@ -457,3 +505,4 @@ func _load_more_results() -> void:
 		return
 	state.load_next_page()
 	_load_more_requested = false
+	call_deferred("_maybe_request_more_results")
