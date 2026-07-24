@@ -5,11 +5,86 @@ const DEFAULT_TIMEOUT_SECONDS := 30.0
 
 var _executor: Callable
 
+class AsyncRequestBroker:
+	extends RefCounted
+
+	static var _shared: AsyncRequestBroker = null
+
+	var _next_task_id: int = 1
+	var _tasks := {}
+
+	static func shared() -> AsyncRequestBroker:
+		if _shared == null:
+			_shared = AsyncRequestBroker.new()
+		return _shared
+
+	func request_async(client: BeatSaverHttpClient, final_request: Dictionary, options: Dictionary, callback: Callable) -> int:
+		if not callback.is_valid():
+			return -1
+		var task_id := _next_task_id
+		_next_task_id += 1
+		var thread := Thread.new()
+		_tasks[task_id] = {"thread": thread, "callback": callback}
+		var start_error := thread.start(Callable(self, "_run_task").bind(task_id, client, final_request.duplicate(true), options.duplicate(true)))
+		if start_error != OK:
+			_tasks.erase(task_id)
+			call_deferred("_deliver_callback", callback, {
+				"ok": false,
+				"status_code": -1,
+				"headers": {},
+				"payload": null,
+				"request": final_request,
+				"error": {
+					"category": "transport",
+					"message": error_string(start_error),
+					"code": start_error,
+				},
+			})
+			return -1
+		return task_id
+
+	func _run_task(task_id: int, client: BeatSaverHttpClient, final_request: Dictionary, options: Dictionary) -> void:
+		var result := client._execute_prepared_request(final_request, options)
+		call_deferred("_complete_task", task_id, result)
+
+	func _complete_task(task_id: int, result: Dictionary) -> void:
+		var task: Dictionary = Dictionary(_tasks.get(task_id, {}))
+		if task.is_empty():
+			return
+		var thread: Thread = task.get("thread")
+		if thread != null:
+			thread.wait_to_finish()
+		_tasks.erase(task_id)
+		_deliver_callback(task.get("callback", Callable()), result)
+
+	func _deliver_callback(callback: Callable, result: Dictionary) -> void:
+		if callback.is_valid():
+			callback.call(result)
+
 func _init(executor: Callable = Callable()) -> void:
 	_executor = executor
 
 func execute(request: Dictionary, options: Dictionary = {}) -> Dictionary:
 	var final_request := prepare_request(request)
+	return _execute_prepared_request(final_request, options)
+
+func execute_async(request: Dictionary, callback: Callable, options: Dictionary = {}) -> Dictionary:
+	var final_request := prepare_request(request)
+	if not callback.is_valid():
+		return {"ok": false, "error": {"category": "request", "message": "execute_async requires a callback.", "code": ERR_INVALID_PARAMETER}}
+	if _executor.is_valid() or bool(options.get("force_sync", false)):
+		callback.call(_execute_prepared_request(final_request, options))
+		return {"ok": true, "pending": true, "request": final_request, "task_id": 0}
+	var task_id := AsyncRequestBroker.shared().request_async(self, final_request, options, callback)
+	return {
+		"ok": task_id >= 0,
+		"pending": task_id >= 0,
+		"request": final_request,
+		"task_id": task_id,
+		"error": {} if task_id >= 0 else {"category": "transport", "message": "Failed to start the BeatSaver async request.", "code": ERR_CANT_CREATE},
+	}
+
+func _execute_prepared_request(final_request: Dictionary, options: Dictionary = {}) -> Dictionary:
 	var raw_result := _dispatch_request(final_request, options)
 	if raw_result.get("transport_error", "") != "":
 		return {

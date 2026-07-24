@@ -39,6 +39,8 @@ var last_preview_cache_path: String = ""
 var _pending_preview_url: String = ""
 var _rendered_result_ids: PackedStringArray = []
 var _load_more_requested: bool = false
+var _load_more_near_bottom_latched: bool = false
+var _last_load_more_trigger_value: float = -1.0
 
 func _ready() -> void:
 	_setup_mode_picker()
@@ -98,6 +100,7 @@ func _wire_ui() -> void:
 	_download_button.pressed.connect(_on_download_pressed)
 
 func _on_mode_selected(index: int) -> void:
+	_reset_load_more_guards()
 	state.mode = "latest" if index == 0 else "search"
 	if state.mode == "latest":
 		state.load_latest()
@@ -105,15 +108,18 @@ func _on_mode_selected(index: int) -> void:
 		state.load_search(_query_line_edit.text)
 
 func _on_query_submitted(_value: String) -> void:
+	_reset_load_more_guards()
 	state.load_search(_query_line_edit.text)
 	_mode_option_button.select(1)
 
 func _on_search_order_selected(index: int) -> void:
+	_reset_load_more_guards()
 	state.search_sort_order = _search_order_value(index)
 	if state.mode == "search":
 		state.load_search(_query_line_edit.text)
 
 func _on_refresh_pressed() -> void:
+	_reset_load_more_guards()
 	if _mode_option_button.selected == 1:
 		state.load_search(_query_line_edit.text)
 		return
@@ -159,7 +165,7 @@ func _select_search_order(sort_order: String) -> void:
 func _sync_filter_menus() -> void:
 	_rebuild_multi_select_popup(_genre_tags_menu_button, state.available_genre_tags(), state.selected_genre_tags())
 	_rebuild_multi_select_popup(_difficulty_menu_button, state.available_difficulties(), state.selected_difficulties())
-	_genre_tags_menu_button.text = _multi_select_button_text("Genres (BeatSaver tags)", state.selected_genre_tags(), func(value: String) -> String:
+	_genre_tags_menu_button.text = _multi_select_button_text("Genres", state.selected_genre_tags(), func(value: String) -> String:
 		return _display_genre_tag(value)
 	)
 	_difficulty_menu_button.text = _multi_select_button_text("Any Difficulty", state.selected_difficulties())
@@ -379,25 +385,42 @@ func _render_state() -> void:
 
 func _render_results_grid() -> void:
 	var visible_result_ids := _visible_result_ids()
-	if visible_result_ids != _rendered_result_ids:
+	if _can_incrementally_append_results(visible_result_ids):
+		_append_results_grid_children(_rendered_result_ids.size())
+		_rendered_result_ids = visible_result_ids
+	elif visible_result_ids != _rendered_result_ids:
 		_rebuild_results_grid()
 		_rendered_result_ids = visible_result_ids
-		return
+	_refresh_result_card_states()
+
+func _rebuild_results_grid() -> void:
+	for child in _results_grid.get_children():
+		child.queue_free()
+	_append_results_grid_children(0)
+
+func _append_results_grid_children(start_index: int) -> void:
+	for index in range(start_index, state.visible_results.size()):
+		var map_detail = state.visible_results[index]
+		var card = RESULT_CARD_SCENE.instantiate()
+		card.bind_map(map_detail)
+		card.button_pressed = map_detail.map_id == state.selected_map_id
+		card.map_chosen.connect(_on_card_chosen)
+		_results_grid.add_child(card)
+
+func _refresh_result_card_states() -> void:
 	for index in range(mini(_results_grid.get_child_count(), state.visible_results.size())):
 		var card = _results_grid.get_child(index)
 		var map_detail = state.visible_results[index]
 		card.bind_map(map_detail)
 		card.button_pressed = map_detail.map_id == state.selected_map_id
 
-func _rebuild_results_grid() -> void:
-	for child in _results_grid.get_children():
-		child.queue_free()
-	for map_detail in state.visible_results:
-		var card = RESULT_CARD_SCENE.instantiate()
-		card.bind_map(map_detail)
-		card.button_pressed = map_detail.map_id == state.selected_map_id
-		card.map_chosen.connect(_on_card_chosen)
-		_results_grid.add_child(card)
+func _can_incrementally_append_results(visible_result_ids: PackedStringArray) -> bool:
+	if visible_result_ids.size() < _rendered_result_ids.size():
+		return false
+	for index in range(_rendered_result_ids.size()):
+		if String(visible_result_ids[index]) != String(_rendered_result_ids[index]):
+			return false
+	return visible_result_ids.size() != _rendered_result_ids.size()
 
 func _visible_result_ids() -> PackedStringArray:
 	var result_ids := PackedStringArray()
@@ -484,19 +507,24 @@ func _on_results_scroll_resized() -> void:
 	_update_results_grid_columns()
 	_maybe_request_more_results()
 
-func _on_results_scroll_value_changed(_value: float) -> void:
+func _on_results_scroll_value_changed(value: float) -> void:
+	if _last_load_more_trigger_value >= 0.0 and value + 24.0 < _last_load_more_trigger_value:
+		_load_more_near_bottom_latched = false
 	_maybe_request_more_results()
 
 func _maybe_request_more_results() -> void:
-	if _load_more_requested or not state.can_load_more_search_results():
-		return
 	var vertical_scroll_bar := _results_scroll.get_v_scroll_bar()
 	if vertical_scroll_bar == null:
 		return
 	var remaining := vertical_scroll_bar.max_value - vertical_scroll_bar.page - vertical_scroll_bar.value
 	if remaining > 160.0:
+		_load_more_near_bottom_latched = false
+		return
+	if _load_more_requested or _load_more_near_bottom_latched or not state.can_load_more_search_results():
 		return
 	_load_more_requested = true
+	_load_more_near_bottom_latched = true
+	_last_load_more_trigger_value = vertical_scroll_bar.value
 	call_deferred("_load_more_results")
 
 func _load_more_results() -> void:
@@ -505,4 +533,8 @@ func _load_more_results() -> void:
 		return
 	state.load_next_page()
 	_load_more_requested = false
-	call_deferred("_maybe_request_more_results")
+
+func _reset_load_more_guards() -> void:
+	_load_more_requested = false
+	_load_more_near_bottom_latched = false
+	_last_load_more_trigger_value = -1.0

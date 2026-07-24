@@ -219,33 +219,84 @@ var error_message: String = ""
 var busy: bool = false
 var package_records := {}
 var shell_opener: Callable
+var async_catalog_loading_enabled: bool = true
+var _collection_request_serial: int = 0
+var _active_collection_request_serial: int = 0
+var _detail_request_serial: int = 0
+var _active_detail_request_serial: int = 0
+var _pending_search_page: int = -1
+var _blocked_search_page: int = -1
 
-func _init(p_facade = null, p_artifact_root: String = "res://.artifacts", p_content_authoring = null, p_shell_opener: Callable = Callable()) -> void:
+func _init(p_facade = null, p_artifact_root: String = "res://.artifacts", p_content_authoring = null, p_shell_opener: Callable = Callable(), p_async_catalog_loading_enabled: bool = true) -> void:
 	facade = p_facade if p_facade != null else BeatSaverVendorFacade.new()
 	artifact_root = p_artifact_root
 	content_authoring = p_content_authoring if p_content_authoring != null else ContentAuthoringBridge.new()
 	shell_opener = p_shell_opener
+	async_catalog_loading_enabled = p_async_catalog_loading_enabled
 
 func load_search(query_text: String = "", page: int = 0, append: bool = false) -> Dictionary:
 	mode = "search"
 	remote_query_text = query_text.strip_edges() if not query_text.is_empty() else remote_query_text
+	if append:
+		if _pending_search_page == page:
+			return {"ok": false, "error": {"message": "BeatSaver page %d is already loading." % page}}
+		if _blocked_search_page == page:
+			return {"ok": false, "error": {"message": "BeatSaver page %d previously failed to load. Refresh or change the search to retry it." % page}}
+	else:
+		_blocked_search_page = -1
+		_pending_search_page = -1
 	busy = true
 	error_message = ""
-	emit_signal("state_changed")
-	var response: Dictionary = facade.search_maps(BeatSaverSearchQuery.new(remote_query_text, page, page_size, search_sort_order, include_automapper, PackedStringArray(), ""))
+	var query := BeatSaverSearchQuery.new(remote_query_text, page, page_size, search_sort_order, include_automapper, PackedStringArray(), "")
+	if _can_use_async_catalog_facade() and facade.has_method("search_maps_async"):
+		_collection_request_serial += 1
+		var request_serial := _collection_request_serial
+		_active_collection_request_serial = request_serial
+		_pending_search_page = page if append else -1
+		emit_signal("state_changed")
+		var accepted: Dictionary = facade.search_maps_async(query, func(response: Dictionary) -> void:
+			_finalize_search_load(request_serial, page, append, response)
+		)
+		if not bool(accepted.get("ok", false)):
+			busy = false
+			_pending_search_page = -1
+			error_message = str(Dictionary(accepted.get("error", {})).get("message", "BeatSaver request failed to start."))
+			emit_signal("state_changed")
+		return accepted
+	var response: Dictionary = facade.search_maps(query)
 	busy = false
+	_pending_search_page = -1
+	if not bool(response.get("ok", false)) and append:
+		_blocked_search_page = page
+	else:
+		_blocked_search_page = -1
 	return _consume_collection_response(response, append)
 
 func load_latest() -> Dictionary:
 	mode = "latest"
+	_blocked_search_page = -1
+	_pending_search_page = -1
 	busy = true
 	error_message = ""
-	emit_signal("state_changed")
-	var response: Dictionary = facade.list_latest_maps({
+	var request_options := {
 		"page_size": page_size,
 		"sort": latest_sort,
 		"automapper": include_automapper
-	})
+	}
+	if _can_use_async_catalog_facade() and facade.has_method("list_latest_maps_async"):
+		_collection_request_serial += 1
+		var request_serial := _collection_request_serial
+		_active_collection_request_serial = request_serial
+		emit_signal("state_changed")
+		var accepted: Dictionary = facade.list_latest_maps_async(func(response: Dictionary) -> void:
+			_finalize_latest_load(request_serial, response)
+		, request_options)
+		if not bool(accepted.get("ok", false)):
+			busy = false
+			error_message = str(Dictionary(accepted.get("error", {})).get("message", "BeatSaver request failed to start."))
+			emit_signal("state_changed")
+		return accepted
+	var response: Dictionary = facade.list_latest_maps(request_options)
 	busy = false
 	return _consume_collection_response(response, false)
 
@@ -255,17 +306,26 @@ func refresh_active_mode() -> Dictionary:
 	return load_latest()
 
 func load_next_page() -> Dictionary:
+	var next_page := current_page + 1
+	if _blocked_search_page == next_page:
+		return {
+			"ok": false,
+			"error": {"message": "BeatSaver page %d previously failed to load. Refresh or change the search to retry it." % next_page}
+		}
 	if not can_load_more_search_results():
 		return {
 			"ok": false,
 			"error": {"message": "No additional BeatSaver search results are available."}
 		}
-	return load_search(remote_query_text, current_page + 1, true)
+	return load_search(remote_query_text, next_page, true)
 
 func can_load_more_search_results() -> bool:
 	if mode != "search" or busy:
 		return false
-	return current_page + 1 < total_pages
+	var next_page := current_page + 1
+	if _blocked_search_page == next_page or _pending_search_page == next_page:
+		return false
+	return next_page < total_pages
 
 func set_filters(tag_filters: PackedStringArray = PackedStringArray(), difficulty_filters: PackedStringArray = PackedStringArray()) -> void:
 	selected_tag_filters = _sanitize_tag_filters(tag_filters)
@@ -325,9 +385,52 @@ func select_map(map_id: String) -> Dictionary:
 	busy = true
 	error_message = ""
 	emit_signal("state_changed")
+	if _can_use_async_catalog_facade() and facade.has_method("fetch_map_detail_by_id_async"):
+		_detail_request_serial += 1
+		var request_serial := _detail_request_serial
+		_active_detail_request_serial = request_serial
+		var accepted: Dictionary = facade.fetch_map_detail_by_id_async(normalized_id, func(response: Dictionary) -> void:
+			_finalize_select_map(request_serial, normalized_id, response)
+		)
+		if not bool(accepted.get("ok", false)):
+			busy = false
+			error_message = str(Dictionary(accepted.get("error", {})).get("message", "Failed to load BeatSaver map detail."))
+			emit_signal("state_changed")
+		return accepted
 	var response: Dictionary = facade.fetch_map_detail_by_id(normalized_id)
 	busy = false
-	if not response.get("ok", false):
+	return _consume_select_map_response(normalized_id, response)
+
+func _can_use_async_catalog_facade() -> bool:
+	return async_catalog_loading_enabled
+
+func _finalize_search_load(request_serial: int, page: int, append: bool, response: Dictionary) -> void:
+	if request_serial != _active_collection_request_serial:
+		return
+	busy = false
+	_pending_search_page = -1
+	if not bool(response.get("ok", false)) and append:
+		_blocked_search_page = page
+	else:
+		_blocked_search_page = -1
+	_consume_collection_response(response, append)
+
+func _finalize_latest_load(request_serial: int, response: Dictionary) -> void:
+	if request_serial != _active_collection_request_serial:
+		return
+	busy = false
+	_pending_search_page = -1
+	_blocked_search_page = -1
+	_consume_collection_response(response, false)
+
+func _finalize_select_map(request_serial: int, normalized_id: String, response: Dictionary) -> void:
+	if request_serial != _active_detail_request_serial:
+		return
+	busy = false
+	_consume_select_map_response(normalized_id, response)
+
+func _consume_select_map_response(normalized_id: String, response: Dictionary) -> Dictionary:
+	if not bool(response.get("ok", false)):
 		error_message = str(response.get("error", {}).get("message", "Failed to load BeatSaver map detail."))
 		emit_signal("state_changed")
 		return response

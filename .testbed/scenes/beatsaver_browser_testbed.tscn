@@ -64,7 +64,7 @@ layout_mode = 2
 custom_minimum_size = Vector2(190, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "Genres (BeatSaver tags)"
+text = "Genres"
 
 [node name="DifficultyMenuButton" type="MenuButton" parent="RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow"]
 custom_minimum_size = Vector2(150, 0)

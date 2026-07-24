@@ -27,6 +27,7 @@ class FakeBeatSaverFacade:
 	var _detail_by_id := {}
 	var _staging_facade: BeatSaverVendorFacade
 	var _search_pages: Array = []
+	var _failed_search_pages := {}
 	var search_calls: int = 0
 	var latest_calls: int = 0
 	var detail_calls: int = 0
@@ -55,6 +56,8 @@ class FakeBeatSaverFacade:
 		search_calls += 1
 		last_search_query = query.to_dictionary()
 		var page_index := clampi(query.page, 0, maxi(_search_pages.size() - 1, 0))
+		if bool(_failed_search_pages.get(page_index, false)):
+			return {"ok": false, "error": {"message": "synthetic search page %d failure" % page_index, "code": ERR_UNAVAILABLE}}
 		var parsed := _parser.parse_search_response(_search_pages[page_index])
 		if not query.text.is_empty():
 			var filtered_maps: Array = []
@@ -83,6 +86,24 @@ class FakeBeatSaverFacade:
 	func stage_selected_version_artifact(map_detail, version_selector: Variant = null, staging_root: String = "res://.artifacts", options: Dictionary = {}) -> Dictionary:
 		stage_calls += 1
 		return _staging_facade.stage_selected_version_artifact(map_detail, version_selector, staging_root, options)
+
+	func append_synthetic_search_page() -> void:
+		_search_pages.append(_build_search_page_payload(_synthetic_search_page(_search_payload), _search_pages.size(), _search_pages.size() + 1))
+		_rewrite_search_page_metadata()
+
+	func fail_search_page(page_index: int) -> void:
+		_failed_search_pages[page_index] = true
+
+	func _rewrite_search_page_metadata() -> void:
+		for page_index in range(_search_pages.size()):
+			var payload: Dictionary = Dictionary(_search_pages[page_index]).duplicate(true)
+			payload["info"] = {
+				"page": page_index,
+				"pages": _search_pages.size(),
+				"total": Array(payload.get("docs", [])).size() * _search_pages.size(),
+				"duration": 0.0,
+			}
+			_search_pages[page_index] = payload
 
 	func _build_search_page_payload(source_payload: Dictionary, page_index: int, total_pages: int) -> Dictionary:
 		var payload := source_payload.duplicate(true)
@@ -433,6 +454,17 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	_assert(state.visible_result_count() == 4, "paged search loading should surface appended visible results")
 	_assert(state.current_page == 1 and not state.can_load_more_search_results(), "search state should stop advertising more pages once the final page is loaded")
 
+	var failed_page_facade := FakeBeatSaverFacade.new(parser, search_payload, latest_payload, detail_payload, package_fetcher)
+	failed_page_facade.fail_search_page(1)
+	var failed_page_state := BeatSaverTestbedState.new(failed_page_facade, "%s/failure" % VALIDATION_UI_ARTIFACT_ROOT, fake_authoring, shell_opener, false)
+	failed_page_state.load_search("fitbeat")
+	var failed_page_result := failed_page_state.load_next_page()
+	_assert(not failed_page_result.get("ok", false), "search state should surface failed incremental page loads")
+	_assert(not failed_page_state.can_load_more_search_results(), "search state should stop advertising failed next pages until a reset")
+	var blocked_retry_result := failed_page_state.load_next_page()
+	_assert(not blocked_retry_result.get("ok", false), "search state should block automatic retries for a failed page")
+	_assert(failed_page_facade.search_calls == 2, "search state should not re-call the facade for the same failed page without a reset")
+
 	var selection_result := state.select_map(first_map.map_id)
 	_assert(selection_result.get("ok", false), "select_map should fetch and store BeatSaver detail")
 	_assert(state.selected_map != null, "select_map should set a selected map")
@@ -516,6 +548,7 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	var results_grid = browser.get_node("RootMargin/RootLayout/BodyLayout/ResultsPanel/ResultsMargin/ResultsVBox/ResultsScroll/ResultsGrid")
 	_assert(results_grid.get_child_count() == browser.state.visible_result_count(), "browser scene should render one card per visible result")
 	_assert(results_grid.columns >= 1 and results_grid.columns <= 2, "results grid should use a bounded adaptive column count")
+	_assert(genre_button.text == "Genres", "browser scene should expose the shortened Genres label")
 	var genre_popup := genre_button.get_popup()
 	if genre_popup.item_count > 0:
 		browser._on_genre_tag_option_pressed(0)
@@ -547,6 +580,40 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 		await process_frame
 	_assert(browser.state.all_results.size() == 4, "browser infinite scroll should append the next search page instead of replacing results")
 	_assert(results_grid.get_child_count() == 4, "browser infinite scroll should render appended result cards")
+
+	var guardrail_facade := FakeBeatSaverFacade.new(parser, search_payload, latest_payload, detail_payload, package_fetcher)
+	guardrail_facade.append_synthetic_search_page()
+	var guardrail_browser: BeatSaverBrowserTestbed = BROWSER_SCENE.instantiate()
+	guardrail_browser.auto_bootstrap = false
+	guardrail_browser.state = BeatSaverTestbedState.new(guardrail_facade, "%s/guardrails" % VALIDATION_UI_ARTIFACT_ROOT, fake_authoring, shell_opener, false)
+	root.add_child(guardrail_browser)
+	await process_frame
+	guardrail_browser.size = Vector2(980, 720)
+	await process_frame
+	guardrail_browser.state.load_search("fitbeat")
+	await process_frame
+	var guardrail_scroll: ScrollContainer = guardrail_browser.get_node("RootMargin/RootLayout/BodyLayout/ResultsPanel/ResultsMargin/ResultsVBox/ResultsScroll")
+	var guardrail_scroll_bar := guardrail_scroll.get_v_scroll_bar()
+	if guardrail_scroll_bar != null:
+		guardrail_scroll_bar.value = guardrail_scroll_bar.max_value
+		guardrail_browser._on_results_scroll_value_changed(guardrail_scroll_bar.value)
+		await process_frame
+		await process_frame
+		guardrail_browser._on_results_scroll_value_changed(guardrail_scroll_bar.value)
+		await process_frame
+		await process_frame
+		_assert(guardrail_facade.search_calls == 2, "browser infinite scroll should not chain-load more than one page in a single near-bottom state")
+		guardrail_scroll_bar.value = 0.0
+		guardrail_browser._on_results_scroll_value_changed(guardrail_scroll_bar.value)
+		await process_frame
+		guardrail_browser._reset_load_more_guards()
+		guardrail_scroll_bar.value = guardrail_scroll_bar.max_value
+		guardrail_browser._on_results_scroll_value_changed(guardrail_scroll_bar.value)
+		await process_frame
+		await process_frame
+		_assert(guardrail_facade.search_calls == 3, "browser infinite scroll should re-arm only after leaving and re-entering the near-bottom state")
+	guardrail_browser.queue_free()
+	await process_frame
 	if results_grid.get_child_count() > 0:
 		var first_card: Control = results_grid.get_child(0)
 		_assert(first_card.custom_minimum_size.x >= 280.0, "result cards should advertise a usable minimum width")

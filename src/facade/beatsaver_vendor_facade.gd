@@ -29,14 +29,26 @@ func _init(http_client: BeatSaverHttpClient = null, request_builder: BeatSaverRe
 func search_maps(query: BeatSaverSearchQuery, options: Dictionary = {}) -> Dictionary:
 	return _execute_and_parse(_request_builder.build_search_request(query), Callable(_response_parser, "parse_search_response"), options)
 
+func search_maps_async(query: BeatSaverSearchQuery, callback: Callable, options: Dictionary = {}) -> Dictionary:
+	return _execute_and_parse_async(_request_builder.build_search_request(query), Callable(_response_parser, "parse_search_response"), callback, options)
+
 func fetch_map_detail_by_id(map_id: String, options: Dictionary = {}) -> Dictionary:
 	return _execute_and_parse(_request_builder.build_map_detail_by_id_request(map_id), Callable(_response_parser, "parse_map_detail"), options)
+
+func fetch_map_detail_by_id_async(map_id: String, callback: Callable, options: Dictionary = {}) -> Dictionary:
+	return _execute_and_parse_async(_request_builder.build_map_detail_by_id_request(map_id), Callable(_response_parser, "parse_map_detail"), callback, options)
 
 func fetch_map_detail_by_hash(map_hash: String, options: Dictionary = {}) -> Dictionary:
 	return _execute_and_parse(_request_builder.build_map_detail_by_hash_request(map_hash), Callable(_response_parser, "parse_map_detail"), options)
 
+func fetch_map_detail_by_hash_async(map_hash: String, callback: Callable, options: Dictionary = {}) -> Dictionary:
+	return _execute_and_parse_async(_request_builder.build_map_detail_by_hash_request(map_hash), Callable(_response_parser, "parse_map_detail"), callback, options)
+
 func list_latest_maps(options: Dictionary = {}) -> Dictionary:
 	return _execute_and_parse(_request_builder.build_latest_maps_request(options), Callable(_response_parser, "parse_latest_response"), options)
+
+func list_latest_maps_async(callback: Callable, options: Dictionary = {}) -> Dictionary:
+	return _execute_and_parse_async(_request_builder.build_latest_maps_request(options), Callable(_response_parser, "parse_latest_response"), callback, options)
 
 func stage_selected_version_artifact(map_detail: BeatSaverMapDetail, version_selector: Variant = null, staging_root: String = "res://.artifacts", options: Dictionary = {}) -> Dictionary:
 	if map_detail == null:
@@ -85,6 +97,15 @@ func _execute_and_parse(request: Dictionary, parser: Callable, options: Dictiona
 		return transport
 	transport["data"] = parser.call(transport.payload if transport.payload is Dictionary else {})
 	return transport
+
+func _execute_and_parse_async(request: Dictionary, parser: Callable, callback: Callable, options: Dictionary) -> Dictionary:
+	if not callback.is_valid():
+		return _error_result("BeatSaver async requests require a callback.")
+	return _http_client.execute_async(request, func(transport: Dictionary) -> void:
+		if bool(transport.get("ok", false)):
+			transport["data"] = parser.call(transport.payload if transport.payload is Dictionary else {})
+		callback.call(transport)
+	, options)
 
 func _resolve_version_ref(map_detail: BeatSaverMapDetail, version_selector: Variant) -> BeatSaverVersionRef:
 	if version_selector == null:
