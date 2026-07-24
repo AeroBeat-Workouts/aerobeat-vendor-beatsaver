@@ -196,7 +196,7 @@ var facade
 var content_authoring
 var artifact_root: String
 var mode: String = "latest"
-var remote_query_text: String = "fitbeat"
+var remote_query_text: String = ""
 var selected_tag_filters: PackedStringArray = PackedStringArray()
 var page_size: int = 12
 var include_automapper = null
@@ -270,7 +270,7 @@ func load_search(query_text: String = "", page: int = 0, append: bool = false) -
 		_blocked_search_page = page
 	else:
 		_blocked_search_page = -1
-	return _consume_collection_response(response, append)
+	return _consume_collection_response(response, append, page)
 
 func load_latest() -> Dictionary:
 	mode = "latest"
@@ -326,6 +326,16 @@ func can_load_more_search_results() -> bool:
 	if _blocked_search_page == next_page or _pending_search_page == next_page:
 		return false
 	return next_page < total_pages
+
+func _resolve_search_total_pages(data: Dictionary) -> int:
+	var provider_pages := maxi(0, int(data.get("pages", 0)))
+	var provider_total := maxi(0, int(data.get("total", 0)))
+	var inferred_pages := 0
+	if provider_total > 0:
+		inferred_pages = int(ceili(float(provider_total) / float(maxi(1, page_size))))
+	var resolved_pages := maxi(provider_pages, inferred_pages)
+	resolved_pages = maxi(resolved_pages, current_page + 1)
+	return resolved_pages
 
 func set_filters(tag_filters: PackedStringArray = PackedStringArray(), difficulty_filters: PackedStringArray = PackedStringArray()) -> void:
 	selected_tag_filters = _sanitize_tag_filters(tag_filters)
@@ -413,7 +423,7 @@ func _finalize_search_load(request_serial: int, page: int, append: bool, respons
 		_blocked_search_page = page
 	else:
 		_blocked_search_page = -1
-	_consume_collection_response(response, append)
+	_consume_collection_response(response, append, page)
 
 func _finalize_latest_load(request_serial: int, response: Dictionary) -> void:
 	if request_serial != _active_collection_request_serial:
@@ -454,15 +464,15 @@ func run_selected_version_action(ui_host: Node, version_identifier: String = "")
 	var effective_identifier := _effective_version_identifier(version_identifier)
 	selected_version_identifier = effective_identifier
 	_refresh_selected_package_truth()
-	var package_record: Dictionary = _selected_package_record()
-	if _record_has_inspectable_package(package_record):
+	var selected_package_record: Dictionary = _selected_package_record()
+	if _record_has_inspectable_package(selected_package_record):
 		last_inspect_result = inspect_selected_version_package()
 		return last_inspect_result
 	busy = true
 	error_message = ""
 	last_download_result = {}
 	last_conversion_result = {}
-	_set_package_record(_selected_package_key(), _build_record_state(effective_identifier, ACTION_DOWNLOAD, 0, package_record))
+	_set_package_record(_selected_package_key(), _build_record_state(effective_identifier, ACTION_DOWNLOAD, 0, selected_package_record))
 	emit_signal("state_changed")
 	if ui_host != null and ui_host.get_tree() != null:
 		await ui_host.get_tree().process_frame
@@ -566,8 +576,8 @@ func preview_selected_version() -> Dictionary:
 	return last_preview_result
 
 func inspect_selected_version_package() -> Dictionary:
-	var package_record: Dictionary = _selected_package_record()
-	if not _record_has_local_package(package_record):
+	var selected_package_record: Dictionary = _selected_package_record()
+	if not _record_has_local_package(selected_package_record):
 		var missing := {
 			"ok": false,
 			"error": {"message": "The converted package is not present on disk yet."}
@@ -577,7 +587,7 @@ func inspect_selected_version_package() -> Dictionary:
 		_refresh_selected_package_truth()
 		emit_signal("state_changed")
 		return missing
-	var package_dir := String(package_record.get("package_dir", "")).strip_edges()
+	var package_dir := String(selected_package_record.get("package_dir", "")).strip_edges()
 	var open_result := _open_external(package_dir)
 	last_inspect_result = {
 		"ok": open_result == OK,
@@ -594,15 +604,15 @@ func inspect_selected_version_package() -> Dictionary:
 func selected_preview_target() -> Dictionary:
 	if selected_map == null:
 		return {"ok": false, "error": {"message": "Select a BeatSaver result before previewing."}}
-	var package_record: Dictionary = _selected_package_record()
-	if _record_has_local_package(package_record):
-		var local_preview_path := String(package_record.get("local_preview_path", "")).strip_edges()
+	var selected_package_record: Dictionary = _selected_package_record()
+	if _record_has_local_package(selected_package_record):
+		var local_preview_path := String(selected_package_record.get("local_preview_path", "")).strip_edges()
 		if not local_preview_path.is_empty() and FileAccess.file_exists(local_preview_path):
 			return {"ok": true, "kind": "local_preview", "target": local_preview_path}
-		var local_source_audio_path := String(package_record.get("local_source_audio_path", "")).strip_edges()
+		var local_source_audio_path := String(selected_package_record.get("local_source_audio_path", "")).strip_edges()
 		if not local_source_audio_path.is_empty() and FileAccess.file_exists(local_source_audio_path):
 			return {"ok": true, "kind": "local_source_audio", "target": local_source_audio_path}
-	var remote_preview_url := String(package_record.get("remote_preview_url", _selected_remote_preview_url())).strip_edges()
+	var remote_preview_url := String(selected_package_record.get("remote_preview_url", _selected_remote_preview_url())).strip_edges()
 	if not remote_preview_url.is_empty():
 		return {"ok": true, "kind": "remote_preview_url", "target": remote_preview_url}
 	return {"ok": false, "error": {"message": "No preview target is available for the selected BeatSaver version."}}
@@ -619,8 +629,8 @@ func preview_button_text() -> String:
 func action_button_text() -> String:
 	if selected_map == null:
 		return "Download"
-	var package_record: Dictionary = _selected_package_record()
-	match String(package_record.get("action", ACTION_DOWNLOAD)):
+	var selected_package_record: Dictionary = _selected_package_record()
+	match String(selected_package_record.get("action", ACTION_DOWNLOAD)):
 		ACTION_INSPECT:
 			return "Inspect"
 		ACTION_VALIDATION_FAILED:
@@ -630,8 +640,8 @@ func action_button_text() -> String:
 		ACTION_CONVERTING:
 			return "Converting"
 		_:
-			var progress := int(package_record.get("progress_percent", 0))
-			if progress > 0 or bool(package_record.get("download_started", false)):
+			var progress := int(selected_package_record.get("progress_percent", 0))
+			if progress > 0 or bool(selected_package_record.get("download_started", false)):
 				return "%d%%" % clampi(progress, 0, 100)
 			return "Download"
 
@@ -685,9 +695,9 @@ func current_status_text() -> String:
 		return "Running BeatSaver testbed package workflow…"
 	if not error_message.is_empty():
 		return error_message
-	var package_record: Dictionary = _selected_package_record()
-	if _record_has_local_package(package_record):
-		return "Converted package ready at %s" % String(package_record.get("package_dir", ""))
+	var selected_package_record: Dictionary = _selected_package_record()
+	if _record_has_local_package(selected_package_record):
+		return "Converted package ready at %s" % String(selected_package_record.get("package_dir", ""))
 	if last_download_result.get("ok", false):
 		var manifest_path := str(last_download_result.get("data", {}).get("manifest", {}).get("manifest_path", ""))
 		if not manifest_path.is_empty():
@@ -697,7 +707,7 @@ func current_status_text() -> String:
 		return "%d result%s ready." % [visible_results.size(), "s" if visible_results.size() != 1 else ""]
 	return "Ready."
 
-func _consume_collection_response(response: Dictionary, append: bool = false) -> Dictionary:
+func _consume_collection_response(response: Dictionary, append: bool = false, requested_page: int = 0) -> Dictionary:
 	last_collection_response = response
 	if not response.get("ok", false):
 		if not append:
@@ -710,11 +720,14 @@ func _consume_collection_response(response: Dictionary, append: bool = false) ->
 		emit_signal("state_changed")
 		return response
 	var data := Dictionary(response.get("data", {}))
-		
-	current_page = int(data.get("page", 0))
-	total_pages = int(data.get("pages", 0))
 	var incoming_results: Array = Array(data.get("maps", []))
 	error_message = ""
+	if mode == "search":
+		current_page = maxi(0, requested_page)
+		total_pages = _resolve_search_total_pages(data)
+	else:
+		current_page = int(data.get("page", 0))
+		total_pages = int(data.get("pages", 0))
 	if append:
 		for map_detail in incoming_results:
 			_append_unique_result(map_detail)

@@ -28,6 +28,8 @@ class FakeBeatSaverFacade:
 	var _staging_facade: BeatSaverVendorFacade
 	var _search_pages: Array = []
 	var _failed_search_pages := {}
+	var _reported_search_pages: int = -1
+	var _omit_page_metadata: bool = false
 	var search_calls: int = 0
 	var latest_calls: int = 0
 	var detail_calls: int = 0
@@ -66,8 +68,9 @@ class FakeBeatSaverFacade:
 					filtered_maps.append(map_detail)
 			parsed["maps"] = filtered_maps
 		parsed["count"] = Array(parsed.get("maps", [])).size()
-		parsed["page"] = page_index
-		parsed["pages"] = _search_pages.size()
+		if not _omit_page_metadata:
+			parsed["page"] = page_index
+		parsed["pages"] = _effective_reported_search_pages()
 		parsed["total"] = _search_pages.size() * Array(parsed.get("maps", [])).size()
 		return {"ok": true, "data": parsed}
 
@@ -94,12 +97,19 @@ class FakeBeatSaverFacade:
 	func fail_search_page(page_index: int) -> void:
 		_failed_search_pages[page_index] = true
 
+	func set_reported_search_pages(page_count: int) -> void:
+		_reported_search_pages = maxi(0, page_count)
+		_rewrite_search_page_metadata()
+
+	func set_omit_page_metadata(enabled: bool) -> void:
+		_omit_page_metadata = enabled
+
 	func _rewrite_search_page_metadata() -> void:
 		for page_index in range(_search_pages.size()):
 			var payload: Dictionary = Dictionary(_search_pages[page_index]).duplicate(true)
 			payload["info"] = {
 				"page": page_index,
-				"pages": _search_pages.size(),
+				"pages": _effective_reported_search_pages(),
 				"total": Array(payload.get("docs", [])).size() * _search_pages.size(),
 				"duration": 0.0,
 			}
@@ -110,10 +120,15 @@ class FakeBeatSaverFacade:
 		payload["info"] = {
 			"page": page_index,
 			"pages": total_pages,
-			"total": Array(source_payload.get("docs", [])).size() * total_pages,
+			"total": Array(source_payload.get("docs", [])).size() * _search_pages.size(),
 			"duration": 0.0,
 		}
 		return payload
+
+	func _effective_reported_search_pages() -> int:
+		if _reported_search_pages >= 0:
+			return _reported_search_pages
+		return _search_pages.size()
 
 	func _synthetic_search_page(source_payload: Dictionary) -> Dictionary:
 		var payload := source_payload.duplicate(true)
@@ -424,6 +439,7 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 		shell_open_targets.append(target)
 		return OK
 	var state := BeatSaverTestbedState.new(fake_facade, VALIDATION_UI_ARTIFACT_ROOT, fake_authoring, shell_opener)
+	_assert(state.remote_query_text.is_empty(), "testbed state should start with a blank remote query instead of a hard-coded default")
 
 	var latest_result := state.load_latest()
 	_assert(latest_result.get("ok", false), "testbed state should load latest results")
@@ -453,6 +469,27 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	_assert(state.all_results.size() == 4, "paged search loading should append results instead of replacing them")
 	_assert(state.visible_result_count() == 4, "paged search loading should surface appended visible results")
 	_assert(state.current_page == 1 and not state.can_load_more_search_results(), "search state should stop advertising more pages once the final page is loaded")
+
+	var underreported_pages_facade := FakeBeatSaverFacade.new(parser, search_payload, latest_payload, detail_payload, package_fetcher)
+	underreported_pages_facade.append_synthetic_search_page()
+	underreported_pages_facade.append_synthetic_search_page()
+	underreported_pages_facade.set_reported_search_pages(2)
+	underreported_pages_facade.set_omit_page_metadata(true)
+	var underreported_pages_state := BeatSaverTestbedState.new(underreported_pages_facade, "%s/underreported" % VALIDATION_UI_ARTIFACT_ROOT, fake_authoring, shell_opener, false)
+	underreported_pages_state.page_size = 2
+	var underreported_search_result := underreported_pages_state.load_search("fitbeat")
+	_assert(underreported_search_result.get("ok", false), "search state should still load when BeatSaver under-reports pages metadata")
+	_assert(underreported_pages_state.total_pages == 4, "search state should infer truthful total pages from total results when provider pages metadata under-reports")
+	_assert(underreported_pages_state.current_page == 0 and underreported_pages_state.can_load_more_search_results(), "search state should advertise page 2 when page metadata is missing")
+	var underreported_page_two := underreported_pages_state.load_next_page()
+	_assert(underreported_page_two.get("ok", false), "search state should reach page 2 even when provider page metadata is omitted")
+	_assert(underreported_pages_state.current_page == 1 and underreported_pages_state.can_load_more_search_results(), "search state should advance local page bookkeeping after page 2 loads")
+	var underreported_page_three := underreported_pages_state.load_next_page()
+	_assert(underreported_page_three.get("ok", false), "search state should reach page 3 even when provider pages metadata still under-reports")
+	_assert(underreported_pages_state.current_page == 2 and underreported_pages_state.can_load_more_search_results(), "search state should keep page 4 reachable from truthful local pagination")
+	var underreported_page_four := underreported_pages_state.load_next_page()
+	_assert(underreported_page_four.get("ok", false), "search state should reach the inferred final page before stopping")
+	_assert(underreported_pages_state.current_page == 3 and not underreported_pages_state.can_load_more_search_results(), "search state should stop only after the inferred final page loads")
 
 	var failed_page_facade := FakeBeatSaverFacade.new(parser, search_payload, latest_payload, detail_payload, package_fetcher)
 	failed_page_facade.fail_search_page(1)
@@ -536,6 +573,8 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	await process_frame
 	browser.size = Vector2(980, 720)
 	await process_frame
+	var query_line_edit: LineEdit = browser.get_node("RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/QueryLineEdit")
+	_assert(query_line_edit.text.is_empty(), "browser scene should start with a blank search query")
 	var search_order_button: OptionButton = browser.get_node("RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/SearchOrderOptionButton")
 	var genre_button: MenuButton = browser.get_node("RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/GenreTagsMenuButton")
 	var difficulty_button: MenuButton = browser.get_node("RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/DifficultyMenuButton")
