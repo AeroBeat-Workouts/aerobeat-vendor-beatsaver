@@ -13,8 +13,10 @@ signal preview_request_finished(result: Dictionary)
 
 @onready var _mode_option_button: OptionButton = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/ModeOptionButton
 @onready var _query_line_edit: LineEdit = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/QueryLineEdit
+@onready var _search_order_option_button: OptionButton = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/SearchOrderOptionButton
 @onready var _filter_line_edit: LineEdit = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/FilterLineEdit
 @onready var _tag_filter_line_edit: LineEdit = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/TagFilterLineEdit
+@onready var _difficulty_option_button: OptionButton = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/DifficultyOptionButton
 @onready var _refresh_button: Button = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/RefreshButton
 @onready var _results_summary_label: Label = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/StatusRow/ResultsSummaryLabel
 @onready var _status_label: Label = $RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/StatusRow/StatusLabel
@@ -37,19 +39,27 @@ var preview_remote_fetcher: Callable = Callable()
 var last_preview_cache_path: String = ""
 var _pending_preview_url: String = ""
 var _rendered_result_ids: PackedStringArray = []
+var _load_more_requested: bool = false
 
 func _ready() -> void:
 	_setup_mode_picker()
+	_setup_search_order_picker()
+	_setup_difficulty_picker()
 	_wire_ui()
 	if state == null:
 		state = BeatSaverTestbedState.new(BeatSaverVendorFacade.new(), "res://.artifacts")
 	state.state_changed.connect(_render_state)
 	_results_scroll.resized.connect(_on_results_scroll_resized)
+	var vertical_scroll_bar := _results_scroll.get_v_scroll_bar()
+	if vertical_scroll_bar != null and not vertical_scroll_bar.value_changed.is_connected(_on_results_scroll_value_changed):
+		vertical_scroll_bar.value_changed.connect(_on_results_scroll_value_changed)
 	if not _preview_http_request.request_completed.is_connected(_on_preview_request_completed):
 		_preview_http_request.request_completed.connect(_on_preview_request_completed)
 	_query_line_edit.text = state.remote_query_text
 	_filter_line_edit.text = state.local_filter_text
 	_tag_filter_line_edit.text = state.tag_filter_text
+	_select_search_order(state.search_sort_order)
+	_select_difficulty_filter(state.difficulty_filter)
 	_mode_option_button.select(0 if state.mode == "latest" else 1)
 	if auto_bootstrap:
 		state.refresh_active_mode()
@@ -61,11 +71,23 @@ func _setup_mode_picker() -> void:
 	_mode_option_button.add_item("Latest")
 	_mode_option_button.add_item("Search")
 
+func _setup_search_order_picker() -> void:
+	_search_order_option_button.clear()
+	for label in ["Relevance", "Latest", "Rating"]:
+		_search_order_option_button.add_item(label)
+
+func _setup_difficulty_picker() -> void:
+	_difficulty_option_button.clear()
+	for label in ["Any Difficulty", "Easy", "Normal", "Hard", "Expert", "ExpertPlus"]:
+		_difficulty_option_button.add_item(label)
+
 func _wire_ui() -> void:
 	_mode_option_button.item_selected.connect(_on_mode_selected)
 	_query_line_edit.text_submitted.connect(_on_query_submitted)
+	_search_order_option_button.item_selected.connect(_on_search_order_selected)
 	_filter_line_edit.text_changed.connect(_on_filter_changed)
 	_tag_filter_line_edit.text_changed.connect(_on_tag_filter_changed)
+	_difficulty_option_button.item_selected.connect(_on_difficulty_selected)
 	_refresh_button.pressed.connect(_on_refresh_pressed)
 	_version_option_button.item_selected.connect(_on_version_selected)
 	_preview_button.pressed.connect(_on_preview_pressed)
@@ -82,6 +104,11 @@ func _on_query_submitted(_value: String) -> void:
 	state.load_search(_query_line_edit.text)
 	_mode_option_button.select(1)
 
+func _on_search_order_selected(index: int) -> void:
+	state.search_sort_order = _search_order_value(index)
+	if state.mode == "search":
+		state.load_search(_query_line_edit.text)
+
 func _on_refresh_pressed() -> void:
 	if _mode_option_button.selected == 1:
 		state.load_search(_query_line_edit.text)
@@ -89,10 +116,48 @@ func _on_refresh_pressed() -> void:
 	state.load_latest()
 
 func _on_filter_changed(_value: String) -> void:
-	state.set_filters(_filter_line_edit.text, _tag_filter_line_edit.text)
+	_apply_local_filters()
 
 func _on_tag_filter_changed(_value: String) -> void:
-	state.set_filters(_filter_line_edit.text, _tag_filter_line_edit.text)
+	_apply_local_filters()
+
+func _on_difficulty_selected(_index: int) -> void:
+	_apply_local_filters()
+
+func _apply_local_filters() -> void:
+	state.set_filters(_filter_line_edit.text, _tag_filter_line_edit.text, _selected_difficulty_filter())
+
+func _selected_difficulty_filter() -> String:
+	if _difficulty_option_button.selected <= 0:
+		return ""
+	return _difficulty_option_button.get_item_text(_difficulty_option_button.selected)
+
+func _search_order_value(index: int) -> String:
+	match index:
+		1:
+			return "latest"
+		2:
+			return "rating"
+		_:
+			return "relevance"
+
+func _select_search_order(sort_order: String) -> void:
+	var normalized := sort_order.strip_edges().to_lower()
+	match normalized:
+		"latest":
+			_search_order_option_button.select(1)
+		"rating":
+			_search_order_option_button.select(2)
+		_:
+			_search_order_option_button.select(0)
+
+func _select_difficulty_filter(filter_name: String) -> void:
+	var normalized := filter_name.strip_edges().to_lower()
+	for index in range(_difficulty_option_button.item_count):
+		if _difficulty_option_button.get_item_text(index).to_lower() == normalized:
+			_difficulty_option_button.select(index)
+			return
+	_difficulty_option_button.select(0)
 
 func _on_version_selected(index: int) -> void:
 	if index < 0:
@@ -254,12 +319,15 @@ func _render_state() -> void:
 	_results_summary_label.text = _results_summary_text()
 	_status_label.text = state.current_status_text()
 	_query_line_edit.editable = not state.busy
+	_search_order_option_button.disabled = state.busy or state.mode != "search"
+	_difficulty_option_button.disabled = state.busy
 	_refresh_button.disabled = state.busy
 	_download_button.disabled = state.action_button_disabled()
 	_preview_button.disabled = not bool(state.selected_preview_target().get("ok", false)) or state.selected_map == null
 	_update_results_grid_columns()
 	_render_results_grid()
 	_render_detail_panel()
+	_maybe_request_more_results()
 
 func _render_results_grid() -> void:
 	var visible_result_ids := _visible_result_ids()
@@ -354,10 +422,38 @@ func _build_detail_bbcode(detail: Dictionary) -> String:
 	return "\n".join(lines)
 
 func _results_summary_text() -> String:
-	return "%d visible result%s (%d fetched)" % [state.visible_results.size(), "s" if state.visible_results.size() != 1 else "", state.all_results.size()]
+	var summary := "%d visible result%s (%d fetched)" % [state.visible_results.size(), "s" if state.visible_results.size() != 1 else "", state.all_results.size()]
+	if state.mode == "search" and state.total_pages > 0:
+		summary += " • page %d/%d" % [state.current_page + 1, state.total_pages]
+	if state.can_load_more_search_results():
+		summary += " • scroll for more"
+	return summary
 
 func _on_card_chosen(map_id: String) -> void:
 	state.select_map(map_id)
 
 func _on_results_scroll_resized() -> void:
 	_update_results_grid_columns()
+	_maybe_request_more_results()
+
+func _on_results_scroll_value_changed(_value: float) -> void:
+	_maybe_request_more_results()
+
+func _maybe_request_more_results() -> void:
+	if _load_more_requested or not state.can_load_more_search_results():
+		return
+	var vertical_scroll_bar := _results_scroll.get_v_scroll_bar()
+	if vertical_scroll_bar == null:
+		return
+	var remaining := vertical_scroll_bar.max_value - vertical_scroll_bar.page - vertical_scroll_bar.value
+	if remaining > 160.0:
+		return
+	_load_more_requested = true
+	call_deferred("_load_more_results")
+
+func _load_more_results() -> void:
+	if not state.can_load_more_search_results():
+		_load_more_requested = false
+		return
+	state.load_next_page()
+	_load_more_requested = false

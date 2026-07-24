@@ -26,10 +26,12 @@ class FakeBeatSaverFacade:
 	var _detail_payload: Dictionary
 	var _detail_by_id := {}
 	var _staging_facade: BeatSaverVendorFacade
+	var _search_pages: Array = []
 	var search_calls: int = 0
 	var latest_calls: int = 0
 	var detail_calls: int = 0
 	var stage_calls: int = 0
+	var last_search_query: Dictionary = {}
 
 	func _init(parser: BeatSaverResponseParser, search_payload: Dictionary, latest_payload: Dictionary, detail_payload: Dictionary, package_fetcher: BeatSaverPackageFetcher) -> void:
 		_parser = parser
@@ -43,18 +45,27 @@ class FakeBeatSaverFacade:
 			if doc is Dictionary:
 				_detail_by_id[str(doc.get("id", "")).to_upper()] = doc
 		_detail_by_id[str(detail_payload.get("id", "")).to_upper()] = detail_payload
+		_search_pages = [
+			_build_search_page_payload(search_payload, 0, 2),
+			_build_search_page_payload(_synthetic_search_page(search_payload), 1, 2),
+		]
 		_staging_facade = BeatSaverVendorFacade.new(null, null, _parser, package_fetcher)
 
 	func search_maps(query: BeatSaverSearchQuery, _options: Dictionary = {}) -> Dictionary:
 		search_calls += 1
-		var parsed := _parser.parse_search_response(_search_payload)
+		last_search_query = query.to_dictionary()
+		var page_index := clampi(query.page, 0, maxi(_search_pages.size() - 1, 0))
+		var parsed := _parser.parse_search_response(_search_pages[page_index])
 		if not query.text.is_empty():
 			var filtered_maps: Array = []
 			for map_detail in parsed.get("maps", []):
 				if map_detail.search_text().to_lower().contains(query.text.to_lower()):
 					filtered_maps.append(map_detail)
 			parsed["maps"] = filtered_maps
-			parsed["count"] = filtered_maps.size()
+		parsed["count"] = Array(parsed.get("maps", [])).size()
+		parsed["page"] = page_index
+		parsed["pages"] = _search_pages.size()
+		parsed["total"] = _search_pages.size() * Array(parsed.get("maps", [])).size()
 		return {"ok": true, "data": parsed}
 
 	func fetch_map_detail_by_id(map_id: String, _options: Dictionary = {}) -> Dictionary:
@@ -72,6 +83,50 @@ class FakeBeatSaverFacade:
 	func stage_selected_version_artifact(map_detail, version_selector: Variant = null, staging_root: String = "res://.artifacts", options: Dictionary = {}) -> Dictionary:
 		stage_calls += 1
 		return _staging_facade.stage_selected_version_artifact(map_detail, version_selector, staging_root, options)
+
+	func _build_search_page_payload(source_payload: Dictionary, page_index: int, total_pages: int) -> Dictionary:
+		var payload := source_payload.duplicate(true)
+		payload["info"] = {
+			"page": page_index,
+			"pages": total_pages,
+			"total": Array(source_payload.get("docs", [])).size() * total_pages,
+			"duration": 0.0,
+		}
+		return payload
+
+	func _synthetic_search_page(source_payload: Dictionary) -> Dictionary:
+		var payload := source_payload.duplicate(true)
+		var docs: Array = []
+		for doc in payload.get("docs", []):
+			if not doc is Dictionary:
+				continue
+			var cloned_doc: Dictionary = Dictionary(doc).duplicate(true)
+			var original_id := str(cloned_doc.get("id", "x"))
+			cloned_doc["id"] = "%s2" % original_id
+			cloned_doc["name"] = "%s Encore" % str(cloned_doc.get("name", "Fitbeat"))
+			if cloned_doc.has("metadata") and cloned_doc.get("metadata") is Dictionary:
+				var metadata: Dictionary = Dictionary(cloned_doc.get("metadata", {})).duplicate(true)
+				metadata["songName"] = "%s Encore" % str(metadata.get("songName", "Fitbeat"))
+				cloned_doc["metadata"] = metadata
+			var versions: Array = Array(cloned_doc.get("versions", [])).duplicate(true)
+			for version_index in range(versions.size()):
+				var version_payload: Dictionary = Dictionary(versions[version_index]).duplicate(true)
+				version_payload["hash"] = "%s%02d" % [str(version_payload.get("hash", "hash")), version_index]
+				var diffs: Array = []
+				for diff_payload in version_payload.get("diffs", []):
+					if not diff_payload is Dictionary:
+						continue
+					var normalized_diff := str(Dictionary(diff_payload).get("difficulty", ""))
+					if normalized_diff == "Normal":
+						continue
+					diffs.append(Dictionary(diff_payload).duplicate(true))
+				version_payload["diffs"] = diffs
+				versions[version_index] = version_payload
+			cloned_doc["versions"] = versions
+			docs.append(cloned_doc)
+			_detail_by_id[str(cloned_doc.get("id", "")).to_upper()] = cloned_doc
+		payload["docs"] = docs
+		return payload
 
 class FakeContentAuthoringService:
 	extends RefCounted
@@ -218,14 +273,16 @@ func _build_silent_wav_bytes(sample_rate: int = 22050, frames: int = 2205) -> Pa
 	return bytes
 
 func _validate_request_builder(builder: BeatSaverRequestBuilder) -> void:
-	var search_query := BeatSaverSearchQuery.new("fitbeat", 2, 10, "latest", false)
+	var search_query := BeatSaverSearchQuery.new("fitbeat", 2, 10, "rating", false, PackedStringArray(), "expert+")
 	var search_request := builder.build_search_request(search_query)
 	_assert(search_request.path == "/search/text/2", "search path should target page 2")
 	_assert(search_request.query.get("q", "") == "fitbeat", "search query should include text")
 	_assert(int(search_request.query.get("pageSize", 0)) == 10, "search pageSize should be preserved")
-	_assert(search_request.query.get("order", "") == "Latest", "search order should use the provider's TitleCase enum")
+	_assert(search_request.query.get("order", "") == "Rating", "search order should use the provider's TitleCase enum")
 	_assert(not search_request.query.has("sortOrder"), "search request should not use the legacy sortOrder parameter")
 	_assert(search_request.query.get("automapper", true) == false, "search automapper should be preserved")
+	_assert(search_query.difficulty_filter == "ExpertPlus", "difficulty filter should normalize to the local canonical label")
+	_assert(not search_request.query.has("difficulty"), "difficulty filter should stay local instead of inventing an upstream query parameter")
 
 	var detail_request := builder.build_map_detail_by_id_request("1")
 	_assert(detail_request.path == "/maps/id/1", "detail request should target id endpoint")
@@ -352,17 +409,29 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	_assert(state.visible_result_count() == 2, "latest mode should expose two visible results")
 	_assert(fake_facade.latest_calls == 1, "latest mode should call the facade latest seam")
 
+	state.search_sort_order = "rating"
 	var search_result := state.load_search("fitbeat")
 	_assert(search_result.get("ok", false), "testbed state should load search results")
 	_assert(state.visible_result_count() == 2, "search mode should expose two visible results")
 	_assert(fake_facade.search_calls == 1, "search mode should call the facade search seam")
+	_assert(fake_facade.last_search_query.get("sort_order", "") == "Rating", "search state should pass the truthful provider search order through the wrapper")
+	_assert(state.current_page == 0 and state.total_pages == 2, "search state should preserve provider page metadata for incremental loading")
+	_assert(state.can_load_more_search_results(), "search state should expose when additional pages are available")
 
 	var first_map = state.visible_results[0]
-	state.set_filters(first_map.map_id, "")
+	state.set_filters(first_map.map_id, "", "")
 	_assert(state.visible_result_count() == 1, "local text filter should narrow visible results")
-	state.set_filters("", str(first_map.tags[0]) if first_map.tags.size() > 0 else "")
+	state.set_filters("", str(first_map.tags[0]) if first_map.tags.size() > 0 else "", "")
 	_assert(state.visible_result_count() >= 1, "tag filter should preserve matching result")
-	state.set_filters("", "")
+	state.set_filters("", "", "Normal")
+	_assert(state.visible_result_count() == 1, "difficulty filter should narrow results through the wrapper layer without inventing upstream params")
+	state.set_filters("", "", "")
+
+	var next_page_result := state.load_next_page()
+	_assert(next_page_result.get("ok", false), "search state should load the next results page when available")
+	_assert(state.all_results.size() == 4, "paged search loading should append results instead of replacing them")
+	_assert(state.visible_result_count() == 4, "paged search loading should surface appended visible results")
+	_assert(state.current_page == 1 and not state.can_load_more_search_results(), "search state should stop advertising more pages once the final page is loaded")
 
 	var selection_result := state.select_map(first_map.map_id)
 	_assert(selection_result.get("ok", false), "select_map should fetch and store BeatSaver detail")
@@ -435,11 +504,36 @@ func _validate_testbed_state_and_scene(parser: BeatSaverResponseParser) -> void:
 	await process_frame
 	browser.size = Vector2(980, 720)
 	await process_frame
+	var search_order_button: OptionButton = browser.get_node("RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/SearchOrderOptionButton")
+	var difficulty_button: OptionButton = browser.get_node("RootMargin/RootLayout/HeaderPanel/HeaderMargin/HeaderVBox/ControlsRow/DifficultyOptionButton")
+	search_order_button.select(2)
+	search_order_button.emit_signal("item_selected", 2)
+	difficulty_button.select(0)
+	difficulty_button.emit_signal("item_selected", 0)
+	await process_frame
 	browser.state.load_search("fitbeat")
 	await process_frame
+	_assert(browser.state.search_sort_order == "rating", "browser scene should expose truthful search ordering controls")
 	var results_grid = browser.get_node("RootMargin/RootLayout/BodyLayout/ResultsPanel/ResultsMargin/ResultsVBox/ResultsScroll/ResultsGrid")
 	_assert(results_grid.get_child_count() == browser.state.visible_result_count(), "browser scene should render one card per visible result")
 	_assert(results_grid.columns >= 1 and results_grid.columns <= 2, "results grid should use a bounded adaptive column count")
+	difficulty_button.select(2)
+	difficulty_button.emit_signal("item_selected", 2)
+	await process_frame
+	_assert(browser.state.difficulty_filter == "Normal", "browser scene should pass difficulty filter selection through the wrapper state")
+	_assert(browser.state.visible_result_count() == 1, "browser difficulty filter should narrow visible results without UI-owned difficulty logic")
+	difficulty_button.select(0)
+	difficulty_button.emit_signal("item_selected", 0)
+	await process_frame
+	var scroll_container: ScrollContainer = browser.get_node("RootMargin/RootLayout/BodyLayout/ResultsPanel/ResultsMargin/ResultsVBox/ResultsScroll")
+	var scroll_bar := scroll_container.get_v_scroll_bar()
+	if scroll_bar != null:
+		scroll_bar.value = scroll_bar.max_value
+		browser._on_results_scroll_value_changed(scroll_bar.value)
+		await process_frame
+		await process_frame
+	_assert(browser.state.all_results.size() == 4, "browser infinite scroll should append the next search page instead of replacing results")
+	_assert(results_grid.get_child_count() == 4, "browser infinite scroll should render appended result cards")
 	if results_grid.get_child_count() > 0:
 		var first_card: Control = results_grid.get_child(0)
 		_assert(first_card.custom_minimum_size.x >= 280.0, "result cards should advertise a usable minimum width")

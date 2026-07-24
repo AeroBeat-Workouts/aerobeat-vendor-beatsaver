@@ -203,6 +203,9 @@ var page_size: int = 12
 var include_automapper = null
 var latest_sort: String = "latest"
 var search_sort_order: String = "relevance"
+var difficulty_filter: String = ""
+var current_page: int = 0
+var total_pages: int = 0
 var all_results: Array = []
 var visible_results: Array = []
 var selected_map = null
@@ -224,15 +227,15 @@ func _init(p_facade = null, p_artifact_root: String = "res://.artifacts", p_cont
 	content_authoring = p_content_authoring if p_content_authoring != null else ContentAuthoringBridge.new()
 	shell_opener = p_shell_opener
 
-func load_search(query_text: String = "", page: int = 0) -> Dictionary:
+func load_search(query_text: String = "", page: int = 0, append: bool = false) -> Dictionary:
 	mode = "search"
 	remote_query_text = query_text.strip_edges() if not query_text.is_empty() else remote_query_text
 	busy = true
 	error_message = ""
 	emit_signal("state_changed")
-	var response: Dictionary = facade.search_maps(BeatSaverSearchQuery.new(remote_query_text, page, page_size, search_sort_order, include_automapper))
+	var response: Dictionary = facade.search_maps(BeatSaverSearchQuery.new(remote_query_text, page, page_size, search_sort_order, include_automapper, PackedStringArray(), difficulty_filter))
 	busy = false
-	return _consume_collection_response(response)
+	return _consume_collection_response(response, append)
 
 func load_latest() -> Dictionary:
 	mode = "latest"
@@ -245,16 +248,30 @@ func load_latest() -> Dictionary:
 		"automapper": include_automapper
 	})
 	busy = false
-	return _consume_collection_response(response)
+	return _consume_collection_response(response, false)
 
 func refresh_active_mode() -> Dictionary:
 	if mode == "search":
-		return load_search(remote_query_text)
+		return load_search(remote_query_text, 0, false)
 	return load_latest()
 
-func set_filters(text_filter: String, tag_filter: String = "") -> void:
+func load_next_page() -> Dictionary:
+	if not can_load_more_search_results():
+		return {
+			"ok": false,
+			"error": {"message": "No additional BeatSaver search results are available."}
+		}
+	return load_search(remote_query_text, current_page + 1, true)
+
+func can_load_more_search_results() -> bool:
+	if mode != "search" or busy:
+		return false
+	return current_page + 1 < total_pages
+
+func set_filters(text_filter: String, tag_filter: String = "", p_difficulty_filter: String = "") -> void:
 	local_filter_text = text_filter.strip_edges()
 	tag_filter_text = tag_filter.strip_edges() if not tag_filter.is_empty() else ""
+	difficulty_filter = BeatSaverSearchQuery.new("", 0, page_size, "", null, PackedStringArray(), p_difficulty_filter).difficulty_filter
 	_rebuild_visible_results()
 	emit_signal("state_changed")
 
@@ -538,20 +555,30 @@ func current_status_text() -> String:
 		return "%d result%s ready." % [visible_results.size(), "s" if visible_results.size() != 1 else ""]
 	return "Ready."
 
-func _consume_collection_response(response: Dictionary) -> Dictionary:
+func _consume_collection_response(response: Dictionary, append: bool = false) -> Dictionary:
 	last_collection_response = response
 	if not response.get("ok", false):
-		all_results.clear()
-		visible_results.clear()
-		selected_map = null
-		selected_map_id = ""
-		selected_version_identifier = ""
+		if not append:
+			all_results.clear()
+			visible_results.clear()
+			selected_map = null
+			selected_map_id = ""
+			selected_version_identifier = ""
 		error_message = str(response.get("error", {}).get("message", "BeatSaver request failed."))
 		emit_signal("state_changed")
 		return response
-	all_results = response.get("data", {}).get("maps", [])
+	var data := Dictionary(response.get("data", {}))
+		
+	current_page = int(data.get("page", 0))
+	total_pages = int(data.get("pages", 0))
+	var incoming_results: Array = Array(data.get("maps", []))
 	error_message = ""
-	last_download_result = {}
+	if append:
+		for map_detail in incoming_results:
+			_append_unique_result(map_detail)
+	else:
+		all_results = incoming_results
+		last_download_result = {}
 	_rebuild_visible_results()
 	if selected_map_id.is_empty() and visible_results.size() > 0:
 		selected_map_id = visible_results[0].map_id
@@ -564,6 +591,14 @@ func _consume_collection_response(response: Dictionary) -> Dictionary:
 	_refresh_selected_package_truth()
 	emit_signal("state_changed")
 	return response
+
+func _append_unique_result(map_detail) -> void:
+	if map_detail == null:
+		return
+	for existing_map_detail in all_results:
+		if existing_map_detail != null and String(existing_map_detail.map_id) == String(map_detail.map_id):
+			return
+	all_results.append(map_detail)
 
 func _rebuild_visible_results() -> void:
 	visible_results.clear()
@@ -586,7 +621,19 @@ func _matches_filters(map_detail) -> bool:
 				break
 		if not tag_match:
 			return false
+	if not difficulty_filter.is_empty() and not _map_has_difficulty(map_detail, difficulty_filter):
+		return false
 	return true
+
+func _map_has_difficulty(map_detail, normalized_difficulty: String) -> bool:
+	for version_ref in map_detail.versions:
+		for difficulty_ref in version_ref.difficulties:
+			if _normalize_difficulty_name(String(difficulty_ref.difficulty)) == normalized_difficulty:
+				return true
+	return false
+
+func _normalize_difficulty_name(raw_difficulty: String) -> String:
+	return BeatSaverSearchQuery.new("", 0, page_size, "", null, PackedStringArray(), raw_difficulty).difficulty_filter
 
 func _visible_results_contain(map_id: String) -> bool:
 	var normalized_id := map_id.strip_edges().to_upper()
