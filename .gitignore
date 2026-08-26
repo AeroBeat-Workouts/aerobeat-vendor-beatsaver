@@ -39,3 +39,6 @@ Thumbs.db
 .claude/
 CLAUDE.md
 AGENTS.md
+
+# Beads / Dolt files (added by bd init)
+.beads/proxieddb/
